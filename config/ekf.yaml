@@ -1,6 +1,6 @@
 # For parameter descriptions, please refer to the template parameter files for each node.
 
-ekf_se_odom:
+ekf_odom:
   ros__parameters:
 
     use_sim_time: false ### odom transform ne postoji ako je ovo true?
