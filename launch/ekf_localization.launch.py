@@ -22,22 +22,28 @@ def generate_launch_description():
                 robot_localization_file_path,# {"use_sim_time": use_sim_time}
             ],
         ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments = ['0', '0', '0', '0', '0', '0', 'base_link', 'imu_link']
-        ),
+        # static transforms for test1.bag2
         #Node(
-        #    package="robot_localization",
-        #    executable="navsat_transform_node",
-        #    name="navsat_transform",
-        #    output="screen",
-        #    parameters=[
-        #        robot_localization_file_path,# {"use_sim_time": use_sim_time}
-        #    ],
-        #    remappings=[
-        #        #("/odometry/filtered", "/odometry/filtered_map"),
-        #        ("/imu/data", "/imu")
-        #    ]
+        #    package='tf2_ros',
+        #    executable='static_transform_publisher',
+        #    arguments = ['0', '0', '0', '0', '0', '0', 'base_link', 'imu_link']
         #),
+        #Node(
+        #    package='tf2_ros',
+        #    executable='static_transform_publisher',
+        #    arguments = ['0', '0', '0', '0', '0', '0', 'base_link', 'gps']
+        #),
+        Node(
+            package="robot_localization",
+            executable="navsat_transform_node",
+            name="navsat_transform",
+            output="screen",
+            parameters=[
+                robot_localization_file_path,
+            ],
+            remappings=[
+                ("/imu/data", "/imu"),
+                #("/gps/fix", "/fix"),
+            ]
+        ),
     ])
