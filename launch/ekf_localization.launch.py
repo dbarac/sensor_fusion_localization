@@ -22,6 +22,11 @@ def generate_launch_description():
                 robot_localization_file_path,# {"use_sim_time": use_sim_time}
             ],
         ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments = ['0', '0', '0', '0', '0', '0', 'base_link', 'imu_link']
+        ),
         #Node(
         #    package="robot_localization",
         #    executable="navsat_transform_node",
