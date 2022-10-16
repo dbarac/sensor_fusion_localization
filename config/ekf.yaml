@@ -21,9 +21,9 @@ ekf_odom:
     publish_tf: true
 
     odom0: /odom #/husky_velocity_controller/odom
-    odom0_config: [true,  true,  false,
-                   false, false, false,
-                   true,  true,  false,
+    odom0_config: [false,  false,  false,
+                   false, false, true,
+                   true,  false,  false,
                    false, false, true,
                    false, false, false]
     odom0_queue_size: 10
@@ -138,8 +138,8 @@ navsat_transform:
     #magnetic_declination_radians: 0.1340413 # taking from first GPS measure (Latitude:	33.0337693283° S Longitude:	60.8846327467° W ----->  7.68° W  ± 0.38°)
     # Your IMU's yaw, once the magentic_declination_radians value is added to it, should report 0 when facing east. If it
     # doesn't, enter the offset here. Defaults to 0.
-    yaw_offset: -1.570796327  # IMU reads 0 facing magnetic north, not east # ESTO ES QUALQUIERA!!!!!!
-    # yaw_offset: 0.0  # IMU reads 0 facing magnetic north, not east
+    #yaw_offset: -1.570796327  # IMU reads 0 facing magnetic north, not east # ESTO ES QUALQUIERA!!!!!!
+    yaw_offset: 0.0  # IMU reads 0 facing magnetic north, not east
 
 
     # If this is true, the altitude is set to 0 in the output odometry message. Defaults to false.
