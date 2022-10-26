@@ -9,12 +9,20 @@ from pathlib import Path
 from typing import List, Union, Optional
 
 import matplotlib.pyplot as plt
+import yaml
+from launch_ros.substitutions import FindPackageShare
 from rosbags.rosbag2 import Reader
 from rosbags.serde import deserialize_cdr
+#from ruamel.yaml import YAML
+
+#yaml = YAML()
+
+LOCALIZATION_PKG = "sensor_fusion_localization"
 
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
-    playback_duration_sec: Optional[int] = None, launch_wait_time: int = 5
+    playback_duration_sec: Optional[int] = None, launch_wait_time: int = 5,
+    log_dir: Optional[Union[Path, str]] = None
 ) -> List[str]:
     """
     Record EKF-fused odometry generated while playing sensor data from
@@ -22,8 +30,17 @@ def run_fusion_localization_on_sensor_data(
 
     Returns list of recorded topics.
     """
+
+    if log_dir is None:
+        # use stdout for process output
+        proc_stdout = lambda proc : None
+    else:
+        # save process logs to file
+        proc_stdout = lambda proc : open(os.path.join(log_dir, f"{proc}.log"), "w")
+
     launch_proc = subprocess.Popen(
         ["ros2", "launch", "sensor_fusion_localization", "ekf_localization.launch.py"]
+        #stdout=proc_stdout("localization"), stderr=subprocess.STDOUT
     )
     logging.info("Waiting for ROS nodes to initialize...")
     time.sleep(launch_wait_time)
@@ -64,7 +81,10 @@ def odom_msg_get_pos(raw_msg: bytes) -> (float, float):
     return pos.x, pos.y
 
 
-def plot_robot_odometry(rosbag_path: Union[Path, str], odom_topics: List[str]) -> None:
+def plot_robot_odometry(
+    rosbag_path: Union[Path, str], odom_topics: List[str],
+    results_dir: Union[Path, str], config_name: str,
+) -> None:
     positions = {
         topic: [] for topic in odom_topics
     }
@@ -78,13 +98,18 @@ def plot_robot_odometry(rosbag_path: Union[Path, str], odom_topics: List[str]) -
         plt.plot(x, y, label=topic)
 
     plt.legend(loc="lower left")
-    plt.title("Robot odometry in /odom frame")
-    plt.show()
+    plt.title(f"Robot odometry in /odom frame ({config_name})")
+    plt.savefig(
+        os.path.join(results_dir, f"{config_name}.png"), dpi=100, bbox_inches="tight"
+    )
+    plt.figure()
+    #plt.show()
 
 
 def evaluate_localization_configs(
     base_rl_config: Union[Path, str], sensor_fusion_configs_yml: Union[Path, str],
-    playback_bag_path: Union[Path, str], output_dir: Union[Path, str]
+    playback_bag_path: Union[Path, str], rl_config_dest: Union[Path, str],
+    eval_output_dir: Union[Path, str]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
 
@@ -96,52 +121,84 @@ def evaluate_localization_configs(
          from given rosbag & and record fusion output
       3. plot sensor odometry & fused odometry
     """
-    with open(base_rl_config) as f:
+    with open(base_rl_config, "r") as f:
         common_config = yaml.safe_load(f)
-    with open(sensor_fusion_configs_yml) as f:
+    with open(sensor_fusion_configs_yml, "r") as f:
         possible_fusion_configs = yaml.safe_load(f)
 
     for config_name, sensor_config in possible_fusion_configs.items():
+        logging.info(f"Evaluating {config_name}...")
         current_ekf_config = common_config.copy()
-        current_ekf_config.update(sensor_config)
+        current_ekf_config.update(sensor_config["rl_config"])
 
-        with open('../config/ekf_current.yaml', 'w') as ekf_config_file:
+        # save config so it will be used when running the localization launch file
+        with open(rl_config_dest, 'w') as ekf_config_file:
             yaml.dump(current_ekf_config, ekf_config_file)
 
-        fusion_output_bag_path = os.path.join(output_dir, "bags/", config_name, ".bag")
+        results_dir = os.path.join(eval_output_dir, config_name)
+        os.mkdir(results_dir)
+        fusion_output_bag_path = os.path.join(results_dir, "rl_output.bag")
+
         recorded_topics = run_fusion_localization_on_sensor_data(
-            playback_bag_path, fusion_output_bag_path
+            playback_bag_path, fusion_output_bag_path, playback_duration_sec=20
         )
-        plot_robot_odometry(fusion_output_bag_path, recorded_topics)
+        plot_robot_odometry(
+            fusion_output_bag_path, recorded_topics, results_dir, config_name
+        )
+        # TODO: evaluate fusion config with provided function
+
+        print("\n\n")
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
 
     ap = argparse.ArgumentParser()
     ap.add_argument(
-        "-s", "--sensor_bag", type=str,
+        "-s", "--sensor_data_bag", type=str,
         help="path to ros2 bag with recorded sensor data"
     )
     ap.add_argument(
-        "-c", "--base_config", type=str,
+        "-b", "--base_config", type=str,
         help="path to base (common) robot_localization .yaml config file"
     )
     ap.add_argument(
         "-d", "--output_dir", type=str, default="/tmp/ekf_eval/",
-        help="path to output directory for storing rosbags, plots, etc."
+        help="path to output directory for storing rosbags, evaluation plots, etc."
     )
-    args = vars(ap.parse_args())
-
-    #assert os.path.exists(args["base_config"])
-    assert args["sensor_bag"] is not None
-    assert os.path.exists(args["output_dir"])
-
-    fusion_output_bag = os.path.join(args["output_dir"], "bags/test1_fused")
-
-    recorded_topics = run_fusion_localization_on_sensor_data(
-        args["sensor_bag"], fusion_output_bag, playback_duration_sec=120
+    ap.add_argument(
+        "-c", "--sensor_configs", type=str,
+        help="path to .yaml config file which defines all sensor fusion " \
+             "configurations which should be evaluated"
     )
-    plot_robot_odometry(fusion_output_bag, recorded_topics)
+    args = ap.parse_args()
+
+    pkg_dir = FindPackageShare(
+        package="sensor_fusion_localization").find("sensor_fusion_localization")
+
+    # path for saving the active robot_localization configuration
+    ekf_config_dest = os.path.join(pkg_dir, "config/current_ekf_config.yaml")
+    #base_rl_config = os.path.join(pkg_dir, "config/ekf_common.yaml")
+    #possible_sensor_configurations = os.path.join(pkg_dir, "config/ekf_common.yaml")
+
+    assert os.path.exists(args.base_config)
+    assert os.path.exists(args.sensor_configs)
+    assert args.sensor_data_bag is not None
+    assert os.path.exists(args.sensor_data_bag)
+    assert os.path.exists(args.output_dir)
+
+    evaluate_localization_configs(
+        args.base_config, args.sensor_configs, args.sensor_data_bag,
+        ekf_config_dest, args.output_dir
+    )
+
+    #fusion_output_bag = os.path.join(args.output_dir, "bags/test1_fused")
+
+    #recorded_topics = run_fusion_localization_on_sensor_data(
+    #    args.sensor_data_bag, fusion_output_bag#, playback_duration_sec=120
+    #)
+    #plot_robot_odometry(fusion_output_bag, recorded_topics)
+
     # load + save ekf config 
     # load test configs path
 

@@ -10,7 +10,7 @@ def generate_launch_description():
     pkg_share = FindPackageShare(
         package="sensor_fusion_localization").find("sensor_fusion_localization")
     default_launch_dir = os.path.join(pkg_share, "launch")
-    robot_localization_file_path = os.path.join(pkg_share, "config/ekf.yaml") 
+    robot_localization_file_path = os.path.join(pkg_share, "config/current_ekf_config.yaml")
 
     return LaunchDescription([
         Node(
