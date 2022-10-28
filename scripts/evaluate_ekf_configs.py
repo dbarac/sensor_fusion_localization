@@ -6,16 +6,13 @@ import subprocess
 import signal
 import time
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import Callable, List, Union, Optional
 
 import matplotlib.pyplot as plt
 import yaml
 from launch_ros.substitutions import FindPackageShare
 from rosbags.rosbag2 import Reader
 from rosbags.serde import deserialize_cdr
-#from ruamel.yaml import YAML
-
-#yaml = YAML()
 
 LOCALIZATION_PKG = "sensor_fusion_localization"
 
@@ -40,7 +37,7 @@ def run_fusion_localization_on_sensor_data(
 
     launch_proc = subprocess.Popen(
         ["ros2", "launch", "sensor_fusion_localization", "ekf_localization.launch.py"]
-        #stdout=proc_stdout("localization"), stderr=subprocess.STDOUT
+        stdout=proc_stdout("localization"), stderr=subprocess.STDOUT
     )
     logging.info("Waiting for ROS nodes to initialize...")
     time.sleep(launch_wait_time)
@@ -49,11 +46,15 @@ def run_fusion_localization_on_sensor_data(
         "/odom", "/odometry/gps", "/odometry/filtered"
     ]
     bag_recording_process = subprocess.Popen(
-        ["ros2", "bag", "record"] + topics_to_record + ["-o", recording_bag_path]
+        ["ros2", "bag", "record"] + topics_to_record + ["-o", recording_bag_path],
+        stdout=proc_stdout("ros2_bag_record"), stderr=subprocess.STDOUT
     )
     logging.info("Playing sensor data rosbag & recording fused output...")
 
-    bag_playback_process = subprocess.Popen(["ros2", "bag", "play", playback_bag_path])
+    bag_playback_process = subprocess.Popen(
+        ["ros2", "bag", "play", playback_bag_path],
+        stdout=proc_stdout("ros2_bag_play"), stderr=subprocess.STDOUT
+    )
 
     try:
         logging.info("Waiting for bag playback to complete...")
@@ -93,23 +94,27 @@ def plot_robot_odometry(
             if connection.topic in odom_topics:
                 positions[connection.topic].append(odom_msg_get_pos(raw_data))
 
-    for topic in positions.keys():
-        x, y = zip(*positions[topic])
-        plt.plot(x, y, label=topic)
+    for odom_topic in positions.keys():
+        if len(positions[odom_topic]) > 0:
+            x, y = zip(*positions[odom_topic])
+            plt.plot(x, y, label=odom_topic)
 
     plt.legend(loc="lower left")
     plt.title(f"Robot odometry in /odom frame ({config_name})")
     plt.savefig(
         os.path.join(results_dir, f"{config_name}.png"), dpi=100, bbox_inches="tight"
     )
-    plt.figure()
-    #plt.show()
+    plt.savefig(
+        os.path.join(results_dir, f"{config_name}.pdf"), dpi=100, bbox_inches="tight"
+    )
+    plt.close()
 
 
 def evaluate_localization_configs(
     base_rl_config: Union[Path, str], sensor_fusion_configs_yml: Union[Path, str],
     playback_bag_path: Union[Path, str], rl_config_dest: Union[Path, str],
-    eval_output_dir: Union[Path, str]
+    eval_output_dir: Union[Path, str],
+    evaluation_function: Callable[[Union[Path, str]], float]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
 
@@ -126,6 +131,11 @@ def evaluate_localization_configs(
     with open(sensor_fusion_configs_yml, "r") as f:
         possible_fusion_configs = yaml.safe_load(f)
 
+    plot_dir = os.path.join(eval_output_dir, "plots")
+    os.mkdir(plot_dir)
+    bag_dir = os.path.join(eval_output_dir, "rosbags")
+    os.mkdir(bag_dir)
+
     for config_name, sensor_config in possible_fusion_configs.items():
         logging.info(f"Evaluating {config_name}...")
         current_ekf_config = common_config.copy()
@@ -135,19 +145,40 @@ def evaluate_localization_configs(
         with open(rl_config_dest, 'w') as ekf_config_file:
             yaml.dump(current_ekf_config, ekf_config_file)
 
-        results_dir = os.path.join(eval_output_dir, config_name)
-        os.mkdir(results_dir)
-        fusion_output_bag_path = os.path.join(results_dir, "rl_output.bag")
+        log_dir = os.path.join(eval_output_dir, "logs", config_name)
+        os.makedirs(log_dir)
+        fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
 
         recorded_topics = run_fusion_localization_on_sensor_data(
-            playback_bag_path, fusion_output_bag_path, playback_duration_sec=20
+            playback_bag_path, fusion_output_bag_path, playback_duration_sec=None
         )
+
         plot_robot_odometry(
-            fusion_output_bag_path, recorded_topics, results_dir, config_name
+            fusion_output_bag_path, recorded_topics, plot_dir, config_name
         )
-        # TODO: evaluate fusion config with provided function
+        # evaluate sensor fusion localization config with provided function
+        error_score = evaluation_function(fusion_output_bag_path)
+        logging.info(f"{config_name} localization error: {error_score}")
 
         print("\n\n")
+
+
+def first_last_pos_abs_distance(Union[Path, str]: fusion_bag) -> float:
+    """
+    Return absolute distance between first and last
+    /odometry/fused position in given rosbag.
+
+    Localization evaluation function for rosbags where
+    the robots first and final position should be the same:
+    """
+    positions = []
+    with Reader(fusion_bag) as reader:
+        for connection, timestamp, raw_data in reader.messages():
+            if connection.topic == "/odometry/fused"
+                positions[connection.topic].append(odom_msg_get_pos(raw_data))
+    first = np.array(positions[0])
+    last = np.array(positions[-1])
+    return np.linalg.norm(first-last)
 
 
 def main():
@@ -198,9 +229,6 @@ def main():
     #    args.sensor_data_bag, fusion_output_bag#, playback_duration_sec=120
     #)
     #plot_robot_odometry(fusion_output_bag, recorded_topics)
-
-    # load + save ekf config 
-    # load test configs path
 
 
 if __name__ == "__main__":
