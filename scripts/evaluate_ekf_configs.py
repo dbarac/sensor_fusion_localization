@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import logging
 import os
 import psutil
@@ -6,7 +7,7 @@ import subprocess
 import signal
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Union, Optional
+from typing import Callable, Dict, Generator, List, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -134,6 +135,85 @@ def merge_configuration(current_config: Dict, new_config: Dict) -> Dict:
                 new_config[rl_node]["ros__parameters"]
             )
     return current_config
+
+
+def expand_covariance_matrix(cov: List) -> List:
+    """
+    Expand covariance matrix if necessary (depending on the
+    dimension of cov).
+    """
+    NUM_STATE_VARIABLES = 15
+    if len(cov) == NUM_STATE_VARIABLES ** 2:
+        # full covariance matrix is already specified
+        return cov
+    elif len(cov) == NUM_STATE_VARIABLES:
+        # only values on the diagonal are specified,
+        # use zeros for other values
+        cov_mat = np.zeros((NUM_STATE_VARIABLES, NUM_STATE_VARIABLES))
+        np.fill_diagonal(cov)
+        return list(np.flatten(cov_mat))
+    else:
+        raise Exception("Dimension of cov is invalid")
+
+
+def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
+    """
+    Generate one or more configurations for robot_localization.
+
+    Expand covariance matrices if only diagonal elements are specified and
+    generate all possible combinations of selected values of parameters
+    in experiment_config for which multiple values should be tested.
+
+    A parameter with multiple values is marked by the value
+    of the parameter being an element named 'try', which maps
+    to a list of values which should be tested for this property,
+
+    For example, the following experiment_config would generate four
+    robot_localization configurations, each with a different combination
+    of imu0_relative and imu0_queue_size:
+    ```
+    ekf_odom:
+      ros__parameters:
+        imu0: /imu
+        odom0_nodelay: false
+        imu0_relative:
+          try: [true, false]
+        imu0_queue_size:
+          try: [10, 20]
+    ```
+    """
+    assert len(experiment_config.keys()) == 1
+    rl_node_name = experiment_config.keys()[0]
+    node_config = experiment_config[rl_node_name]["ros__parameters"]
+
+    variable_config_params = {} # parameters with multiple possible values
+    for param, value in node_config.items():
+        not_yet_selected = \
+            lambda config_val : type(config_val) is dict and "try" in config_val
+        if not_yet_selected(value):
+            possible_values = value["try"]
+            assert type(possible_values) == list
+            variable_config_params[param] = possible_values
+        elif param in ("process_noise_covariance", "initial_estimate_covariance"):
+            node_config[param] = expand_covariance_matrix(value)
+
+    if len(variable_config_params) > 0:
+        # go through every combination in Cartesian product of possible parameter values
+        for value_combination in itertools.product(*variable_config_params.values()):
+            param_names = variable_config_params.keys()
+            for param, val in zip(param_names, value_combination):
+                if param in ("process_noise_covariance", "initial_estimate_covariance"):
+                    val = expand_covariance_matrix(val)
+                node_config[param] = val
+            yield {
+                rl_node_name : {
+                    "ros__parameters": node_config
+                }
+            }
+    else:
+        # all parameter values are already determined
+        experiment_config[rl_node_name]["ros__paramters"] = node_config
+        yield experiment_config
 
 
 def evaluate_localization_configs(
