@@ -154,9 +154,9 @@ def expand_covariance_matrix(cov: List) -> List:
     elif len(cov) == NUM_STATE_VARIABLES:
         # only values on the diagonal are specified,
         # use zeros for other values
-        cov_mat = np.zeros((NUM_STATE_VARIABLES, NUM_STATE_VARIABLES))
-        np.fill_diagonal(cov)
-        return list(np.flatten(cov_mat))
+        cov_mat = np.zeros((NUM_STATE_VARIABLES, NUM_STATE_VARIABLES), dtype=np.float)
+        np.fill_diagonal(cov_mat, cov)
+        return list(cov_mat.flatten())
     else:
         raise Exception("Dimension of cov is invalid")
 
@@ -188,7 +188,7 @@ def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
     ```
     """
     assert len(experiment_config.keys()) == 1
-    rl_node_name = experiment_config.keys()[0]
+    rl_node_name = list(experiment_config.keys())[0]
     node_config = experiment_config[rl_node_name]["ros__parameters"]
 
     variable_config_params = {} # parameters with multiple possible values
@@ -231,12 +231,14 @@ def evaluate_localization_configs(
 
     For each combination/configuration of sensors, defined as a top-level
     entry in the sensor_fusion_configs_yml yaml file:
-      1. combine the given sensor configuration with the base ekf configuration
-         and save it
-      2. run sensor fusion localization launch file while playing sensor data
-         from given rosbag & and record fusion output
-      3. plot sensor odometry & fused odometry
-      4. calculate localization error score with given evaluation function
+    * generate multiple robot_localization configs if multiple values should
+      be tested for some parameters
+    * combine the each generated sensor configuration with the base EKF
+      configuration and save it
+    * run sensor fusion localization launch file while playing sensor data
+      from given rosbag & and record fusion output
+    * plot sensor odometry & fused odometry
+    * calculate localization error score with given evaluation function
     """
     with open(base_rl_config, "r") as f:
         common_config = yaml.safe_load(f)
@@ -250,33 +252,33 @@ def evaluate_localization_configs(
     config_dir = os.path.join(eval_output_dir, "rl_configs")
     os.mkdir(config_dir)
 
-    for config_name, sensor_config in possible_fusion_configs.items():
-        logging.info(f"Evaluating localization config '{config_name}'...")
+    for name, sensor_config in possible_fusion_configs.items():
+        for i, rl_config in enumerate(generate_rl_configs(sensor_config["rl_config"])):
+            config_name = f"{name}_{i}"
+            logging.info(f"Evaluating localization config '{config_name}'...")
+            current_ekf_config = merge_configuration(common_config.copy(), rl_config)
 
-        current_ekf_config = merge_configuration(
-             common_config.copy(), sensor_config["rl_config"]
-        )
-        # save config so it will be used when running the localization launch file
-        with open(rl_config_dest, 'w') as ekf_config_file:
-            yaml.dump(current_ekf_config, ekf_config_file)
+            # save config so it will be used when running the localization launch file
+            with open(rl_config_dest, 'w') as ekf_config_file:
+                yaml.dump(current_ekf_config, ekf_config_file)
 
-        with open(os.path.join(config_dir, f"{config_name}.yaml"), 'w') as f:
-            yaml.dump(current_ekf_config, f) # backup config for later use
+            with open(os.path.join(config_dir, f"{config_name}.yaml"), 'w') as f:
+                yaml.dump(current_ekf_config, f) # backup config for later use
 
-        log_dir = os.path.join(eval_output_dir, "logs", config_name)
-        os.makedirs(log_dir)
-        fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
+            log_dir = os.path.join(eval_output_dir, "logs", config_name)
+            os.makedirs(log_dir)
+            fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
 
-        fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
-        run_fusion_localization_on_sensor_data(
-            playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir
-        )
-        plot_robot_odometry(
-            fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
-        )
-        # evaluate sensor fusion localization config with provided function
-        error_score = evaluation_function(fusion_output_bag_path)
-        logging.info(f"{config_name} localization error: {error_score}\n\n")
+            fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
+            run_fusion_localization_on_sensor_data(
+                playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir
+            )
+            plot_robot_odometry(
+                fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
+            )
+            # evaluate sensor fusion localization config with provided function
+            error_score = evaluation_function(fusion_output_bag_path)
+            logging.info(f"{config_name} localization error: {error_score}\n\n")
 
 
 def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
