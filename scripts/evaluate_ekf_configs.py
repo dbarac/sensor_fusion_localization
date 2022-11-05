@@ -2,7 +2,6 @@ import argparse
 import itertools
 import logging
 import os
-import psutil
 import subprocess
 import signal
 import time
@@ -11,6 +10,7 @@ from typing import Callable, Dict, Generator, List, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+import psutil
 import yaml
 from launch_ros.substitutions import FindPackageShare
 from rosbags.rosbag2 import Reader
@@ -20,16 +20,13 @@ LOCALIZATION_PKG = "sensor_fusion_localization"
 
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
-    playback_duration_sec: Optional[int] = None, launch_wait_time: int = 5,
-    log_dir: Optional[Union[Path, str]] = None
-) -> List[str]:
+    topics_to_record: List[str], playback_duration_sec: Optional[int] = None,
+    launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None
+) -> None:
     """
     Record EKF-fused odometry generated while playing sensor data from
     the 'playback_bag_path' bag, and save it in 'recording_bag_path'.
-
-    Returns list of recorded topics.
     """
-
     if log_dir is None:
         # use stdout for process output
         proc_stdout = lambda proc : None
@@ -38,15 +35,12 @@ def run_fusion_localization_on_sensor_data(
         proc_stdout = lambda proc : open(os.path.join(log_dir, f"{proc}.log"), "w")
 
     launch_proc = subprocess.Popen(
-        ["ros2", "launch", "sensor_fusion_localization", "ekf_localization.launch.py"],
+        ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"],
         stdout=proc_stdout("localization"), stderr=subprocess.STDOUT
     )
     logging.info("Waiting for ROS nodes to initialize...")
     time.sleep(launch_wait_time)
 
-    topics_to_record = [
-        "/odom", "/odometry/gps", "/odometry/filtered"
-    ]
     bag_recording_process = subprocess.Popen(
         ["ros2", "bag", "record"] + topics_to_record + ["-o", recording_bag_path],
         stdout=proc_stdout("ros2_bag_record"), stderr=subprocess.STDOUT
@@ -74,8 +68,6 @@ def run_fusion_localization_on_sensor_data(
         child.send_signal(signal.SIGINT)
     launch_proc.send_signal(signal.SIGINT)
     launch_proc.wait()
-
-    return topics_to_record
 
 
 def odom_msg_get_pos(raw_msg: bytes) -> (float, float):
@@ -112,16 +104,29 @@ def plot_robot_odometry(
     plt.close()
 
 
-def get_used_odom_topics(rl_config: Dict) -> List[str]:
+def get_fusion_topics(
+        rl_config: Dict, types: Optional[List[str]] = None,
+        include_output_topic: bool = True
+) -> List[str]:
     """
-    Return all odometry topics used for EKF in rl_config configuration.
-    Example of odometry source definition: 'odom1: /odometry/gps'.
+    Return EKF fusion input and output topics defined in rl_config configuration.
+    Example of fusion input definition: 'odom1: /odometry/gps'.
     """
     ekf_config = rl_config["ekf_odom"]["ros__parameters"]
-    defines_odometry_source = lambda key : key.startswith("odom") and key[4:].isdecimal()
-    return [
-        value for key, value in ekf_config.items() if defines_odometry_source(key)
-    ]
+    if types is None:
+        types = ["odom", "imu", "twist", "pose"] # any type
+
+    defines_fusion_input = lambda param, input_type : \
+        param.startswith(input_type) and param[len(input_type):].isdecimal()
+    fusion_topics = []
+    for param, value in ekf_config.items():
+        for input_type in types:
+            if defines_fusion_input(param, input_type):
+                fusion_topics.append(value)
+    if include_output_topic:
+        fusion_topics.append("/odometry/filtered")
+
+    return fusion_topics
 
 
 def merge_configuration(current_config: Dict, new_config: Dict) -> Dict:
@@ -189,7 +194,7 @@ def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
     variable_config_params = {} # parameters with multiple possible values
     for param, value in node_config.items():
         not_yet_selected = \
-            lambda config_val : type(config_val) is dict and "try" in config_val
+            lambda param_val : type(param_val) is dict and "try" in param_val
         if not_yet_selected(value):
             possible_values = value["try"]
             assert type(possible_values) == list
@@ -262,13 +267,12 @@ def evaluate_localization_configs(
         os.makedirs(log_dir)
         fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
 
-        recorded_topics = run_fusion_localization_on_sensor_data(
-            playback_bag_path, fusion_output_bag_path, log_dir=log_dir
+        fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
+        run_fusion_localization_on_sensor_data(
+            playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir
         )
-        fused_topics = get_used_odom_topics(sensor_config["rl_config"])
         plot_robot_odometry(
-            fusion_output_bag_path, fused_topics + ["/odometry/filtered"],
-            plot_dir, config_name
+            fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
         )
         # evaluate sensor fusion localization config with provided function
         error_score = evaluation_function(fusion_output_bag_path)
@@ -277,7 +281,7 @@ def evaluate_localization_configs(
 
 def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
     """
-    Return absolute distance between first and last
+    Return distance between first and last
     /odometry/fused position in given rosbag.
 
     Localization evaluation function for rosbags where
@@ -316,8 +320,7 @@ def main():
     )
     args = ap.parse_args()
 
-    pkg_dir = FindPackageShare(
-        package="sensor_fusion_localization").find("sensor_fusion_localization")
+    pkg_dir = FindPackageShare(package=LOCALIZATION_PKG).find(LOCALIZATION_PKG)
 
     # path for saving the active robot_localization configuration
     ekf_config_dest = os.path.join(pkg_dir, "config/current_ekf_config.yaml")
