@@ -23,11 +23,11 @@ def generate_launch_description():
             ],
         ),
         # static transforms for test1.bag2
-        #Node(
-        #    package='tf2_ros',
-        #    executable='static_transform_publisher',
-        #    arguments = ['0', '0', '0', '0', '0', '0', 'base_link', 'imu_link']
-        #),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments = ['0', '0', '0', '0', '0', '0', 'map', 'odom']
+        ),
         #Node(
         #    package='tf2_ros',
         #    executable='static_transform_publisher',
@@ -42,8 +42,9 @@ def generate_launch_description():
                 robot_localization_file_path,
             ],
             remappings=[
-                ("/imu/data", "/imu"),
-                #("/gps/fix", "/fix"),
+                #("/odometry/filtered", "/wheel/odometry"), # not needed for sim
+                #("/imu/data", "/imu"), # not needed for sim
+                ("/gps/fix", "/fix"),
             ]
         ),
     ])

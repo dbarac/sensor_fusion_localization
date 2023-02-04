@@ -21,7 +21,8 @@ LOCALIZATION_PKG = "sensor_fusion_localization"
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
     topics_to_record: List[str], playback_duration_sec: Optional[int] = None,
-    launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None
+    launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None,
+    playback_bag_topics: Optional[List[str]] = None
 ) -> None:
     """
     Record EKF-fused odometry generated while playing sensor data from
@@ -47,8 +48,12 @@ def run_fusion_localization_on_sensor_data(
     )
     logging.info("Playing sensor data rosbag & recording fused output...")
 
+    playback_topics_args = []
+    if playback_bag_topics is not None:
+        playback_topics_args = ["--topics", *playback_bag_topics]
+    print(playback_topics_args)
     bag_playback_process = subprocess.Popen(
-        ["ros2", "bag", "play", playback_bag_path],
+        ["ros2", "bag", "play", playback_bag_path, "--clock"] + playback_topics_args,
         stdout=proc_stdout("ros2_bag_play"), stderr=subprocess.STDOUT
     )
 
@@ -88,9 +93,10 @@ def plot_robot_odometry(
             if connection.topic in odom_topics:
                 positions[connection.topic].append(odom_msg_get_pos(raw_data))
 
+    plt.axis('equal')
     for odom_topic in positions.keys():
         if len(positions[odom_topic]) > 0:
-            x, y = zip(*positions[odom_topic])
+            x, y = zip(*positions[odom_topic][:-3])
             plt.plot(x, y, label=odom_topic)
 
     plt.legend(loc="lower left")
@@ -257,7 +263,6 @@ def evaluate_localization_configs(
             config_name = f"{name}_{i}"
             logging.info(f"Evaluating localization config '{config_name}'...")
             current_ekf_config = merge_configuration(common_config.copy(), rl_config)
-
             # save config so it will be used when running the localization launch file
             with open(rl_config_dest, 'w') as ekf_config_file:
                 yaml.dump(current_ekf_config, ekf_config_file)
@@ -272,6 +277,8 @@ def evaluate_localization_configs(
             fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir
+                ,playback_bag_topics=sensor_config.get("sensor_data_bag_topics")
+                #,playback_duration_sec=30
             )
             plot_robot_odometry(
                 fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
@@ -295,8 +302,47 @@ def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
             if connection.topic == "/odometry/filtered":
                 positions.append(odom_msg_get_pos(raw_data))
     first = np.array(positions[0])
-    last = np.array(positions[-1])
+    last = np.array(positions[-5])
+    for p in positions:
+        print(p)
     return np.linalg.norm(first-last)
+
+
+def loop_closure_error_sum(
+        fusion_bag: Union[Path, str], loop_closure_times_sec: List[int]
+    ) -> float:
+    """
+    Return sum of distances (errors) for each time the robot
+    robot returned to initial position ().
+
+    Localization evaluation function for rosbags where
+    the robot returns to the initial position one or multiple times.
+    """
+    expected_pos = None
+    positions = []
+    start_time = None
+    estimated_positions = [None for i in range(len(loop_closure_times_sec))]
+    time_diffs = [1000000 for i in range(len(loop_closure_times_sec))]
+
+    # find estimated positions in odometry messages with timestamp
+    # closest to each given loop closure time
+    with Reader(fusion_bag) as reader:
+        for connection, timestamp, raw_data in reader.messages():
+            if start_time is None:
+                start_time = timestamp.sec
+            if connection.topic == "/odometry/filtered":
+                if expected_pos is None:
+                    expected_pos = odom_msg_get_pos(raw_data)
+                for i, time in enumerate(loop_closure_times_sec):
+                    diff = abs(timestamp.sec - loop_closure_times_sec[i])
+                    if diff < time_diffs[i]:
+                        time_diffs[i] = diff
+                        estimated_positions[i] = odom_msg_get_pos(raw_data)
+
+    errors = [
+        np.linalg.norm(estimated - expected_pos) for estimated in estimated_positions
+    ]
+    return sum(errors)
 
 
 def main():
