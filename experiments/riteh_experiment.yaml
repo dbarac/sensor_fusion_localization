@@ -1,0 +1,38 @@
+odom_gps:
+  description: "EKF with wheel odometry, IMU and GPS"
+  # select topics which should be played (optional argument - all topics played by default)
+  sensor_data_bag_topics: ["/clock", "/cmd_vel", "/tf", "/tf_static", "/RosAria/pose", "/fix"]
+  rl_config:
+    ekf_odom:
+      ros__parameters:
+        use_control: true
+        # Whether the input (assumed to be cmd_vel) is a geometry_msgs/Twist or geometry_msgs/TwistStamped message. Defaults to
+        # false.
+        stamped_control: false
+        # The last issued control command will be used in prediction for this period. Defaults to 0.2.
+        control_timeout: 0.2
+        # Which velocities are being controlled. Order is vx, vy, vz, vroll, vpitch, vyaw.
+        control_config: [true, false, false, false, false, true]
+
+        odom0: /RosAria/pose
+        odom0_config: [false,  false,  false,
+                       false, false, false,
+                       true,  true,  false,
+                       false, false, true,
+                       false, false, false]
+        odom0_queue_size: 10
+        odom0_nodelay: false
+        odom0_differential: false
+        odom0_relative: true
+    
+        #odom1: /odometry/gps
+        #odom1_config: [true,  true,  false,
+        #              false, false, false,
+        #              false, false, false,
+        #              false, false, false,
+        #              false, false, false]
+        #odom1_queue_size: 10
+        #odom1_nodelay: true
+        #odom1_differential: false
+        #odom1_relative: false
+
