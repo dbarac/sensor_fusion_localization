@@ -6,6 +6,7 @@ odom_gps:
      "/tf_static", "/clock",
     "/camera/imu", "/camera/aligned_depth_to_color/image_raw", "/camera/color/image_raw", "/camera/color/camera_info", "/camera/aligned_depth_to_color/camera_info",
   ]
+  localization_launch_args: ["rgbd_odom:=true", "rtabmap:=false", "run_rviz:=true"]
   rl_config:
     ekf_odom:
       ros__parameters:

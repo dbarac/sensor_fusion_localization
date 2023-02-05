@@ -22,7 +22,8 @@ def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
     topics_to_record: List[str], playback_duration_sec: Optional[int] = None,
     launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None,
-    playback_bag_topics: Optional[List[str]] = None
+    playback_bag_topics: Optional[List[str]] = None,
+    launch_args: Optional[List[str]] = None
 ) -> None:
     """
     Record EKF-fused odometry generated while playing sensor data from
@@ -35,8 +36,11 @@ def run_fusion_localization_on_sensor_data(
         # save process logs to file
         proc_stdout = lambda proc : open(os.path.join(log_dir, f"{proc}.log"), "w")
 
+    if launch_args is None:
+        launch_args = []
+
     launch_proc = subprocess.Popen(
-        ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"],
+        ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"] + launch_args,
         stdout=proc_stdout("localization"), stderr=subprocess.STDOUT
     )
     logging.info("Waiting for ROS nodes to initialize...")
@@ -276,8 +280,9 @@ def evaluate_localization_configs(
 
             fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
             run_fusion_localization_on_sensor_data(
-                playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir
-                ,playback_bag_topics=sensor_config.get("sensor_data_bag_topics")
+                playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
+                playback_bag_topics=sensor_config.get("sensor_data_bag_topics"),
+                launch_args=sensor_config.get("localization_launch_args")
                 #,playback_duration_sec=30
             )
             plot_robot_odometry(

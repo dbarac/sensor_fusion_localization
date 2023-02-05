@@ -10,8 +10,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_share = FindPackageShare(
         package="sensor_fusion_localization").find("sensor_fusion_localization")
-    #default_launch_dir = os.path.join(pkg_share, "launch")
-    robot_localization_file_path = os.path.join(pkg_share, "config/current_ekf_config.yaml")
+    robot_localization_config_file = os.path.join(pkg_share, "config/current_ekf_config.yaml")
     rviz_config_file = os.path.join(pkg_share, "config/realsense-odom.rviz")
 
     rtabmap_parameters = [{
@@ -22,14 +21,12 @@ def generate_launch_description():
           'approx_sync': False,
           #'use_sim_time': True,
           'queue_size': 120,
-          #'depth_topic': '/camera/depth/image_rect_raw',
     }]
     rtabmap_remappings = [
         ('rgb/image', '/camera/color/image_raw'),
         ('rgb/camera_info', '/camera/color/camera_info'),
         ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
         ('/odom', '/rgbd_odom'),
-        #('depth/image', '/camera/depth/image_rect_raw')]
     ]
     return LaunchDescription([
         DeclareLaunchArgument("rtabmap", default_value="True", description="Run rtabmap & rtabmapviz?"),
@@ -61,7 +58,7 @@ def generate_launch_description():
             name="ekf_odom",
             output="screen",
             parameters=[
-                robot_localization_file_path,# {"use_sim_time": use_sim_time}
+                robot_localization_config_file,# {"use_sim_time": use_sim_time}
             ],
         ),
         # static transforms for test1.bag2
@@ -76,7 +73,7 @@ def generate_launch_description():
             name="navsat_transform",
             output="screen",
             parameters=[
-                robot_localization_file_path,
+                robot_localization_config_file,
             ],
             remappings=[
                 #("/imu/data", "/imu"), # not needed for sim
@@ -93,7 +90,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', rviz_config_file]
+            arguments=['-d', rviz_config_file],
             condition=IfCondition(LaunchConfiguration("run_rviz")),
         )
-   ])
+    ])
