@@ -32,7 +32,18 @@ def generate_launch_description():
         DeclareLaunchArgument("rtabmap", default_value="True", description="Run rtabmap & rtabmapviz?"),
         DeclareLaunchArgument("rgbd_odom", default_value="True", description="Run rtabmap rgbd_odometry?"),
         DeclareLaunchArgument("run_rviz", default_value="True", description="Run rviz?"),
+        DeclareLaunchArgument(
+            "gps_checker", default_value="True",
+            description="Check /fix messages and publish on /fix/checked? (publish only if position changes)"
+        ),
         # Nodes to launch
+        Node(
+            package="sensor_fusion_localization",
+            executable="gps_duplicate_checker",
+            name="gps_duplicate_checker",
+            output="screen",
+            condition=IfCondition(LaunchConfiguration("gps_checker"))
+        ),
         Node(
             package='rtabmap_ros', executable='rgbd_odometry', output='screen',
             parameters=rtabmap_parameters,
