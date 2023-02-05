@@ -1,7 +1,11 @@
 odom_gps:
   description: "EKF with wheel odometry, IMU and GPS"
   # select topics which should be played (optional argument - all topics played by default)
-  sensor_data_bag_topics: ["/clock", "/odom", "/tf", "/tf_static", "/camera/imu"]
+  # "/clock", "/tf"
+  sensor_data_bag_topics: [
+     "/tf_static", "/clock",
+    "/camera/imu", "/camera/aligned_depth_to_color/image_raw", "/camera/color/image_raw", "/camera/color/camera_info", "/camera/aligned_depth_to_color/camera_info",
+  ]
   rl_config:
     ekf_odom:
       ros__parameters:
@@ -15,7 +19,7 @@ odom_gps:
         # Which velocities are being controlled. Order is vx, vy, vz, vroll, vpitch, vyaw.
         control_config: [true, false, false, false, false, true]
 
-        odom0: /odom
+        odom0: /rgbd_odom
         odom0_config: [false,  false,  false,
                        false, false, false,
                        true,  true,  false,
