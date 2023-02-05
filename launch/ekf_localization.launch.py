@@ -20,7 +20,7 @@ def generate_launch_description():
           'Odom/ResetCountdown':"1",
           'approx_sync': False,
           #'use_sim_time': True,
-          'queue_size': 120,
+          'queue_size': 100#120,
     }]
     rtabmap_remappings = [
         ('rgb/image', '/camera/color/image_raw'),
@@ -29,12 +29,17 @@ def generate_launch_description():
         ('/odom', '/rgbd_odom'),
     ]
     return LaunchDescription([
+        DeclareLaunchArgument("ekf", default_value="True", description="Run robot_localization ekf_node?"),
         DeclareLaunchArgument("rtabmap", default_value="True", description="Run rtabmap & rtabmapviz?"),
         DeclareLaunchArgument("rgbd_odom", default_value="True", description="Run rtabmap rgbd_odometry?"),
         DeclareLaunchArgument("run_rviz", default_value="True", description="Run rviz?"),
         DeclareLaunchArgument(
             "gps_checker", default_value="True",
             description="Check /fix messages and publish on /fix/checked? (publish only if position changes)"
+        ),
+        DeclareLaunchArgument(
+            "realsense", default_value="False",
+            description="Run realsense2_camera_node (D455 color, depth & IMU)?"
         ),
         # Nodes to launch
         Node(
@@ -44,6 +49,30 @@ def generate_launch_description():
             output="screen",
             condition=IfCondition(LaunchConfiguration("gps_checker"))
         ),
+        Node(
+            package='realsense2_camera',
+            executable='realsense2_camera_node',
+            namespace="camera",
+            name="realsense_camera",
+            parameters=[{
+                "enable_depth": True,
+                "enable_color": True,
+                "enable_gyro": True,
+                "enable_accel": True,
+                "unite_imu_method": 2,
+                "rgbd_camera.profile": "848x480x15",
+                "depth_module.profile": "848x480x15",
+                "align_depth.enable": True,
+                "enable_sync": True,
+                "hole_filling_filter.enable": True,
+                "depth_module.enable_auto_exposure": True,
+            }],
+            output='screen',
+            arguments=['--ros-args', '--log-level', "info"],
+            condition=IfCondition(LaunchConfiguration("realsense"))
+            #emulate_tty=True,
+        ),
+        # ** RTAB-Map **
         Node(
             package='rtabmap_ros', executable='rgbd_odometry', output='screen',
             parameters=rtabmap_parameters,
@@ -63,6 +92,7 @@ def generate_launch_description():
             remappings=rtabmap_remappings,
             condition=IfCondition(LaunchConfiguration("rtabmap"))
         ),
+        # ** robot_localization **
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -71,13 +101,8 @@ def generate_launch_description():
             parameters=[
                 robot_localization_config_file,# {"use_sim_time": use_sim_time}
             ],
+            condition=IfCondition(LaunchConfiguration("ekf"))
         ),
-        # static transforms for test1.bag2
-        #Node(
-        #    package='tf2_ros',
-        #    executable='static_transform_publisher',
-        #    arguments = ['0', '0', '0', '0', '0', '0', 'map', 'odom']
-        #),
         Node(
             package="robot_localization",
             executable="navsat_transform_node",
@@ -91,6 +116,12 @@ def generate_launch_description():
                 ("/gps/fix", "/fix"),
             ]
         ),
+        # static transforms for test1.bag2
+        #Node(
+        #    package='tf2_ros',
+        #    executable='static_transform_publisher',
+        #    arguments = ['0', '0', '0', '0', '0', '0', 'map', 'odom']
+        #),
         #IncludeLaunchDescription(
         #    PythonLaunchDescriptionSource(
         #        os.path.join(pkg_share, 'launch', 'realsense_d400.launch.py')
