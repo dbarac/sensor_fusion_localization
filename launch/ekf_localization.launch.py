@@ -66,8 +66,9 @@ def generate_launch_description():
                 "accel_fps": 63, # default
                 "gyro_fps": 200, # default
                 "unite_imu_method": 2, # 1:nn, 2:interpolation
-                "rgb_camera.profile": "480x270x30", # some options: "{424x240,640x360,848x480}x{5,15,30}"
-                "depth_module.profile": "480x270x30", # some options: "{424x240,640x360,848x480}x{5,15,30}"
+                "rgb_camera.profile": "480x270x15", # some options: "{424x240,640x360,848x480}x{5,15,30}"
+                "depth_module.profile": "480x270x15", # some options: "{424x240,640x360,848x480}x{5,15,30}"
+                "depth_module.emitter_enabled": 1,
                 "align_depth.enable": True,
                 "enable_sync": True,
                 #"hole_filling_filter.enable": True,
@@ -121,7 +122,7 @@ def generate_launch_description():
             remappings=[
                 #("/imu/data", "/imu"), # not needed for sim
                 ("/gps/fix", "/fix"),
-            ]
+            ],
             condition=IfCondition(LaunchConfiguration("ekf"))
         ),
         # static transforms for test1.bag2
