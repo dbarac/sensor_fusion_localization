@@ -14,19 +14,23 @@ def generate_launch_description():
     rviz_config_file = os.path.join(pkg_share, "config/realsense-odom.rviz")
 
     rtabmap_parameters = [{
-          'frame_id': 'camera_link',
-          'subscribe_depth': True,
-          #'publish_null_when_lost':False,
-          'Odom/ResetCountdown':"1",
-          'approx_sync': False,
-          #'use_sim_time': True,
-          'queue_size': 100#120,
+        'frame_id': 'camera_link',
+        'subscribe_depth': True,
+        #'publish_null_when_lost':False,
+        'Odom/ResetCountdown':"1",
+        'approx_sync': False,
+        #'use_sim_time': True,
+        'queue_size': 120,
+        #"wait_imu_to_init": True,
+        #"Reg/Force3DoF": True,
+        #"Optimizer/Slam2D": True,
     }]
     rtabmap_remappings = [
         ('rgb/image', '/camera/color/image_raw'),
         ('rgb/camera_info', '/camera/color/camera_info'),
         ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
         ('/odom', '/rgbd_odom'),
+        #("imu", "/camera/imu"),
     ]
     return LaunchDescription([
         DeclareLaunchArgument("ekf", default_value="True", description="Run robot_localization ekf_node?"),
@@ -59,12 +63,15 @@ def generate_launch_description():
                 "enable_color": True,
                 "enable_gyro": True,
                 "enable_accel": True,
-                "unite_imu_method": 2,
-                "rgbd_camera.profile": "848x480x15",
-                "depth_module.profile": "848x480x15",
+                "accel_fps": 63, # default
+                "gyro_fps": 200, # default
+                "unite_imu_method": 2, # 1:nn, 2:interpolation
+                "rgb_camera.profile": "480x270x30", # some options: "{424x240,640x360,848x480}x{5,15,30}"
+                "depth_module.profile": "480x270x30", # some options: "{424x240,640x360,848x480}x{5,15,30}"
                 "align_depth.enable": True,
                 "enable_sync": True,
-                "hole_filling_filter.enable": True,
+                #"hole_filling_filter.enable": True,
+                "rgb_camera.enable_auto_exposure": True,
                 "depth_module.enable_auto_exposure": True,
             }],
             output='screen',
@@ -115,17 +122,13 @@ def generate_launch_description():
                 #("/imu/data", "/imu"), # not needed for sim
                 ("/gps/fix", "/fix"),
             ]
+            condition=IfCondition(LaunchConfiguration("ekf"))
         ),
         # static transforms for test1.bag2
         #Node(
         #    package='tf2_ros',
         #    executable='static_transform_publisher',
         #    arguments = ['0', '0', '0', '0', '0', '0', 'map', 'odom']
-        #),
-        #IncludeLaunchDescription(
-        #    PythonLaunchDescriptionSource(
-        #        os.path.join(pkg_share, 'launch', 'realsense_d400.launch.py')
-        #    ),
         #),
         Node(
             package='rviz2',
