@@ -14,7 +14,7 @@ def generate_launch_description():
     rviz_config_file = os.path.join(pkg_share, "config/realsense-odom.rviz")
 
     rtabmap_parameters = [{
-        'frame_id': 'camera_link',
+        'frame_id': 'camera_link', # set to base_link if using on robot?
         'subscribe_depth': True,
         #'publish_null_when_lost':False,
         'Odom/ResetCountdown':"1",
@@ -34,9 +34,10 @@ def generate_launch_description():
     ]
     return LaunchDescription([
         DeclareLaunchArgument("ekf", default_value="True", description="Run robot_localization ekf_node?"),
-        DeclareLaunchArgument("rtabmap", default_value="True", description="Run rtabmap & rtabmapviz?"),
+        DeclareLaunchArgument("rtabmap", default_value="False", description="Run rtabmap?"),
+        DeclareLaunchArgument("rtabmapviz", default_value="False", description="Run rtabmapviz?"),
         DeclareLaunchArgument("rgbd_odom", default_value="True", description="Run rtabmap rgbd_odometry?"),
-        DeclareLaunchArgument("run_rviz", default_value="True", description="Run rviz?"),
+        DeclareLaunchArgument("rviz", default_value="False", description="Run rviz?"),
         DeclareLaunchArgument(
             "gps_checker", default_value="True",
             description="Check /fix messages and publish on /fix/checked? (publish only if position changes)"
@@ -72,6 +73,8 @@ def generate_launch_description():
                 "align_depth.enable": True,
                 "enable_sync": True,
                 #"hole_filling_filter.enable": True,
+                #"disparity_filter.enable": False,
+                #"disparity_to_depth.enable": False,
                 "rgb_camera.enable_auto_exposure": True,
                 "depth_module.enable_auto_exposure": True,
             }],
@@ -98,7 +101,7 @@ def generate_launch_description():
             package='rtabmap_ros', executable='rtabmapviz', output='screen',
             parameters=rtabmap_parameters,
             remappings=rtabmap_remappings,
-            condition=IfCondition(LaunchConfiguration("rtabmap"))
+            condition=IfCondition(LaunchConfiguration("rtabmapviz"))
         ),
         # ** robot_localization **
         Node(
@@ -137,6 +140,6 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments=['-d', rviz_config_file],
-            condition=IfCondition(LaunchConfiguration("run_rviz")),
+            condition=IfCondition(LaunchConfiguration("rviz")),
         )
     ])
