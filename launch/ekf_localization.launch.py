@@ -14,24 +14,24 @@ def generate_launch_description():
     rviz_config_file = os.path.join(pkg_share, "config/robot-ekf-localization.rviz")
 
     rtabmap_parameters = {
-        'frame_id': 'base_link', # set to base_link if using on robot?
-        'subscribe_depth': True,
-        #'publish_null_when_lost':False,
-        'Odom/ResetCountdown':"1",
-        #'Vis/MinInliers':"40",
-        'approx_sync': False,
-        #'use_sim_time': True,
-        'queue_size': 120,
-        'publish_tf': True, #rtabmap->map, rgbd_odometry->odom
+        "frame_id": "base_link",
+        "subscribe_depth": True,
+        #"publish_null_when_lost":False,
+        "Odom/ResetCountdown":"1",
+        #"Vis/MinInliers":"40",
+        "approx_sync": False,
+        #"use_sim_time": True,
+        "queue_size": 120,
+        "publish_tf": True, #rtabmap->map, rgbd_odometry->odom
         #"wait_imu_to_init": True,
         #"Reg/Force3DoF": True,
         #"Optimizer/Slam2D": True,
     }
     rtabmap_remappings = [
-        ('rgb/image', '/camera/color/image_raw'),
-        ('rgb/camera_info', '/camera/color/camera_info'),
-        ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
-        ('/odom', '/rgbd_odom'),
+        ("rgb/image", "/camera/color/image_raw"),
+        ("rgb/camera_info", "/camera/color/camera_info"),
+        ("depth/image", "/camera/aligned_depth_to_color/image_raw"),
+        ("/odom", "/rgbd_odom"),
         #("imu", "/camera/imu"),
     ]
     return LaunchDescription([
@@ -65,7 +65,7 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration("gps_checker"))
         ),
         Node(
-            package='realsense2_camera', executable='realsense2_camera_node',
+            package="realsense2_camera", executable="realsense2_camera_node",
             namespace="camera", name="realsense_camera",
             parameters=[{
                 "enable_depth": True,
@@ -83,31 +83,31 @@ def generate_launch_description():
                 "rgb_camera.enable_auto_exposure": True,
                 "depth_module.enable_auto_exposure": True,
             }],
-            output='screen',
-            arguments=['--ros-args', '--log-level', "info"],
+            output="screen",
+            arguments=["--ros-args", "--log-level", "info"],
             condition=IfCondition(LaunchConfiguration("realsense"))
         ),
         # ** RTAB-Map **
         Node(
-            package='rtabmap_ros', executable='rgbd_odometry', output='screen',
+            package="rtabmap_ros", executable="rgbd_odometry", output="screen",
             parameters=[
                 rtabmap_parameters, {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=rtabmap_remappings,
-            arguments=['--ros-args', '--log-level', "warn"], # a lot of output when set to 'info' (default)
+            arguments=["--ros-args", "--log-level", "warn"], # a lot of output when set to "info" (default)
             condition=IfCondition(LaunchConfiguration("rgbd_odom"))
         ),
         Node(
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package="rtabmap_ros", executable="rtabmap", output="screen",
             parameters=[
                 rtabmap_parameters, {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=rtabmap_remappings,
-            arguments=['-d'],
+            arguments=["-d"],
             condition=IfCondition(LaunchConfiguration("rtabmap"))
         ),
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package="rtabmap_ros", executable="rtabmapviz", output="screen",
             parameters=[rtabmap_parameters],
             remappings=rtabmap_remappings,
             condition=IfCondition(LaunchConfiguration("rtabmapviz"))
@@ -135,27 +135,27 @@ def generate_launch_description():
                 ("gps/fix", "/fix/checked"),
                 ("odometry/filtered", "/rgbd_odom"),
             ],
-            arguments=['--ros-args', '--log-level', "error"],
+            arguments=["--ros-args", "--log-level", "error"],
             condition=IfCondition(LaunchConfiguration("navsat_transform"))
         ),
         # if rtabmap is not used, publish static map->odom transform
         # to enable fusing GPS (/fix/checked) and odometry (rgbd, wheel)
         Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
+            package="tf2_ros",
+            executable="static_transform_publisher",
             parameters=[{
                 "use_sim_time": LaunchConfiguration("use_sim_time")
             }],
-            arguments = ['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+            arguments = ["0", "0", "0", "0", "0", "0", "map", "odom"],
             condition=UnlessCondition(LaunchConfiguration("rtabmap"))
         ),
         # ** RViz - display wheel odometry, visual odometry, GPS odometry & EKF fused odometry **
         Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            output='screen',
-            arguments=['-d', rviz_config_file],
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            output="screen",
+            arguments=["-d", rviz_config_file],
             parameters=[{
                 "use_sim_time": LaunchConfiguration("use_sim_time")
             }],
