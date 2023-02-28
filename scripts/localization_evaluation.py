@@ -1,14 +1,17 @@
 #import argparse
 import itertools
 import logging
+import math
 import os
 #import subprocess
 #import signal
 import time
 from pathlib import Path
 from typing import Callable, Dict, Generator, List, Union, Optional, TextIO
+
 import matplotlib.pyplot as plt
 import numpy as np
+import tf_transformations
 #import psutil
 #import yaml
 #from launch_ros.substitutions import FindPackageShare
@@ -95,6 +98,7 @@ def ground_truth_error_with_estimated_covariances(
 
     first_bag_timestamp = None
     estimated_positions = [None] * len(gt_positions)
+    estimated_yaw = [None] * len(gt_positions)
     pose_est_variances = [None] * len(gt_positions)
     time_diffs = [int(1e15)] * len(gt_positions)
 
@@ -121,25 +125,39 @@ def ground_truth_error_with_estimated_covariances(
                         msg = deserialize_cdr(raw_msg, "nav_msgs/msg/Odometry")
                         pos = msg.pose.pose.position
                         estimated_positions[i] = pos.x, pos.y
+                        o = msg.pose.pose.orientation
+                        estimated_yaw[i] = tf_transformations.euler_from_quaternion(
+                            [o.x, o.y, o.z, o.w]
+                        )[2] # RPY
                         cov = msg.pose.covariance
                         pose_est_variances[i] = cov[VAR_X], cov[VAR_Y], cov[VAR_YAW]
 
-    logging.info(f"{estimated_positions}")
     position_errors = []
     for est, real in zip(estimated_positions, gt_positions):
         position_errors.append(np.linalg.norm(np.array(est) - np.array(real)))
 
+    normalize_0_2pi = lambda theta: \
+        math.fmod(theta, 2*math.pi) + (2 * math.pi if theta < 0 else 0)
+    yaw_errors = []
+    for est, real in zip(estimated_yaw, pose_ground_truth["yaw"]):
+        err = abs(normalize_0_2pi(est) - normalize_0_2pi(real))
+        yaw_errors.append(min(err, abs(err - 2 * math.pi)))
+
     results = [
-        position_errors[-1], sum(position_errors), *pose_est_variances[-1]
+        position_errors[-1], sum(position_errors), yaw_errors[-1], sum(yaw_errors),
+        *pose_est_variances[-1]
     ]
 
-    logging.info(f"{config_name} evaluation results:")
     names = [
-        "Final position error", "Position error sum", "Final x estimate variance",
-        "Final y estimate variance", "Final yaw estimate variance"
+        "Final position error", "Position error sum", "Final yaw (abs) error", "Yaw error sum",
+        "Final x estimate variance", "Final y estimate variance", "Final yaw estimate variance"
     ]
-    res_info = ",".join(f"{name}: {value}" for name, value in zip(names, results))
-    logging.info(f"{res_info}\n")
+    res_info = "\n" + "*" * 64 + "\n"
+    res_info += f"Evaluation results for config '{config_name}':\n"
+    res_info += "\n".join(f"\t{name}: {value}" for name, value in zip(names, results))
+    res_info += "\n" + "*" * 64
+    logging.info(res_info)
 
-    results_file.write(f"{config_name},")
-    results_file.write(",".join((str(r) for r in results)) + "\n")
+    if results_file:
+        results_file.write(f"{config_name},")
+        results_file.write(",".join((str(r) for r in results)) + "\n")
