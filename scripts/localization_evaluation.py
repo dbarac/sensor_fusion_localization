@@ -93,13 +93,13 @@ def ground_truth_error_with_estimated_covariances(
 
     gt_positions = list(zip(pose_ground_truth["x"], pose_ground_truth["y"]))
 
-    start_time = None
+    first_bag_timestamp = None
     estimated_positions = [None] * len(gt_positions)
-    pos_est_covariances = [None] * len(gt_positions)
+    pose_est_variances = [None] * len(gt_positions)
     time_diffs = [int(1e15)] * len(gt_positions)
 
-    time_diff_us = lambda msg_time_ns, gt_time_sec: \
-        abs(msg_time_ns // 1000 - gt_time_sec * int(1e6))
+    time_diff_ms = lambda msg_time_ns, gt_time_sec: \
+        abs((msg_time_ns - first_bag_timestamp) // int(1e6) - gt_time_sec * 1000)
 
     # indices of flattened covariance matrix
     VAR_X = 0
@@ -109,44 +109,37 @@ def ground_truth_error_with_estimated_covariances(
     # find estimated poses/covariances in odometry messages with timestamp
     # closest to each given ground truth time
     with Reader(fusion_bag) as reader:
-        for conn, timestamp, raw_data in reader.messages():
-            if start_time is None:
-                start_time = timestamp
-            logging.info(f"{conn.topic}, {pos_estimate_topic}")
+        for conn, timestamp, raw_msg in reader.messages():
+            if first_bag_timestamp is None:
+                first_bag_timestamp = timestamp
             if conn.topic == pos_estimate_topic:
                 for i, time_sec in enumerate(pose_ground_truth["times_sec"]):
-                    diff = time_diff_us(timestamp, time_sec)
+                    diff = time_diff_ms(timestamp, time_sec)
                     logging.info(f"diff {diff}")
                     if diff < time_diffs[i]:
-                        logging.info("better")
                         time_diffs[i] = diff
                         msg = deserialize_cdr(raw_msg, "nav_msgs/msg/Odometry")
                         pos = msg.pose.pose.position
                         estimated_positions[i] = pos.x, pos.y
-                        cov = msg.pose.covariances
-                        pos_est_covariances[i] = cov[VAR_X], cov[VAR_Y], cov[VAR_YAW]
+                        cov = msg.pose.covariance
+                        pose_est_variances[i] = cov[VAR_X], cov[VAR_Y], cov[VAR_YAW]
 
     logging.info(f"{estimated_positions}")
-    pos_errors = []
+    position_errors = []
     for est, real in zip(estimated_positions, gt_positions):
-        pos_errors.append(np.linalg.norm(np.array(est) - np.array(real)))
-
-    # assume that the loop is closed at the last given ground truth position
-    # (the robot returned to the start position)
-    loop_closure_err = pos_errors[-1]
-    final_pose_variances = pos_est_covariances[-1] # 2D pose variances (x, y, yaw)
+        position_errors.append(np.linalg.norm(np.array(est) - np.array(real)))
 
     results = [
-        loop_closure_err, sum(pos_errors), *final_pose_variances
+        position_errors[-1], sum(position_errors), *pose_est_variances[-1]
     ]
 
     logging.info(f"{config_name} evaluation results:")
     names = [
-        "pos_loop_closure_error", "pos_error_sum", "final_x_est_var",
-        "final_y_est_var", "final_yaw_est_var"
+        "Final position error", "Position error sum", "Final x estimate variance",
+        "Final y estimate variance", "Final yaw estimate variance"
     ]
     res_info = ",".join(f"{name}: {value}" for name, value in zip(names, results))
     logging.info(f"{res_info}\n")
 
     results_file.write(f"{config_name},")
-    results.write(",".join((str(r) for r in results)) + "\n")
+    results_file.write(",".join((str(r) for r in results)) + "\n")
