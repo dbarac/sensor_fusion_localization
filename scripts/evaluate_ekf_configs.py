@@ -55,7 +55,6 @@ def run_fusion_localization_on_sensor_data(
     playback_topics_args = []
     if playback_bag_topics is not None:
         playback_topics_args = ["--topics", *playback_bag_topics]
-    print(playback_topics_args)
     bag_playback_process = subprocess.Popen(
         ["ros2", "bag", "play", playback_bag_path, "--clock"] + playback_topics_args,
         stdout=proc_stdout("ros2_bag_play"), stderr=subprocess.STDOUT
@@ -262,6 +261,12 @@ def evaluate_localization_configs(
     config_dir = os.path.join(eval_output_dir, "rl_configs")
     os.mkdir(config_dir)
 
+    if playback_bag_path.endswith(".yaml"):
+        with open(playback_bag_path, "r") as f:
+            bag_info = yaml.safe_load(f)
+            playback_bag_path = bag_info["path"]
+            pose_ground_truth = bag_info["pose_ground_truth"]
+
     for name, sensor_config in possible_fusion_configs.items():
         for i, rl_config in enumerate(generate_rl_configs(sensor_config["rl_config"])):
             config_name = f"{name}_{i}"
@@ -283,7 +288,6 @@ def evaluate_localization_configs(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
                 playback_bag_topics=sensor_config.get("sensor_data_bag_topics"),
                 launch_args=sensor_config.get("localization_launch_args")
-                #,playback_duration_sec=30
             )
             plot_robot_odometry(
                 fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
@@ -299,7 +303,7 @@ def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
     /odometry/fused position in given rosbag.
 
     Localization evaluation function for rosbags where
-    the robots first and final position should be the same:
+    the robots first and final position should be the same.
     """
     positions = []
     with Reader(fusion_bag) as reader:
@@ -307,48 +311,107 @@ def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
             if connection.topic == "/odometry/filtered":
                 positions.append(odom_msg_get_pos(raw_data))
     first = np.array(positions[0])
+    # ignore last few messages, there is a small delay between
+    # the end of sensor data bag playback and the end of recording
+    # the result playback
     last = np.array(positions[-5])
-    for p in positions:
-        print(p)
     return np.linalg.norm(first-last)
 
 
-def loop_closure_error_sum(
-        fusion_bag: Union[Path, str], loop_closure_times_sec: List[int]
+def ground_truth_error_sum(
+        fusion_bag: Union[Path, str], gt_times_sec: List[int],
+        gt_positions: List[int], pos_estimate_topic: str = "odometry/filtered"
     ) -> float:
     """
-    Return sum of distances (errors) for each time the robot
-    robot returned to initial position ().
+    Localization evaluation function.
 
-    Localization evaluation function for rosbags where
-    the robot returns to the initial position one or multiple times.
+    Return sum of distances (errors) of estimates for each
+    timestamp (in gt_times_sec) when the robot position is known.
+
+    Use estimated positions with the timestamps closest to ground truth timestamps.
     """
-    expected_pos = None
-    positions = []
+    assert len(gt_times_sec) == len(ground_truth_x) == len(ground_truth_y)
+
     start_time = None
-    estimated_positions = [None for i in range(len(loop_closure_times_sec))]
-    time_diffs = [1000000 for i in range(len(loop_closure_times_sec))]
+    estimated_positions = [None] * len(gt_positions)
+    time_diffs = [int(1e15)] * len(gt_times_sec)
+
+    time_diff_us = lambda msg_time_ns, gt_time_sec: \
+        abs(msg_time_ns // 1000 - gt_time_sec * int(1e6))
 
     # find estimated positions in odometry messages with timestamp
-    # closest to each given loop closure time
+    # closest to each given ground truth time
     with Reader(fusion_bag) as reader:
-        for connection, timestamp, raw_data in reader.messages():
+        for conn, timestamp, raw_data in reader.messages():
             if start_time is None:
-                start_time = timestamp.sec
-            if connection.topic == "/odometry/filtered":
-                if expected_pos is None:
-                    expected_pos = odom_msg_get_pos(raw_data)
-                for i, time in enumerate(loop_closure_times_sec):
-                    diff = abs(timestamp.sec - loop_closure_times_sec[i])
+                start_time = timestamp
+            if conn.topic == pos_estimate_topic:
+                for i, time in enumerate(ground_truth_times_sec):
+                    diff = time_diff_us(timestamp - ground_truth_times_sec[i])
                     if diff < time_diffs[i]:
                         time_diffs[i] = diff
                         estimated_positions[i] = odom_msg_get_pos(raw_data)
-
     errors = [
         np.linalg.norm(estimated - expected_pos) for estimated in estimated_positions
     ]
     return sum(errors)
 
+
+def ground_truth_error_with_estimated_covariances(
+        fusion_bag: Union[Path, str], pose_ground_truth: Dict[str, List],
+        pos_estimate_topic: str = "odometry/filtered"
+    ) -> None:
+    """
+    Localization evaluation function.
+
+    Return sum of distances (errors) of estimates for each
+    timestamp (in gt_times_sec) when the robot position is known.
+
+    Use estimated positions with the timestamps closest to ground truth timestamps.
+    """
+    assert pose_ground_truth.keys() == {"times_sec", "x", "y", "yaw"}
+
+    gt_positions = zip(pose_ground_truth["x"], pose_ground_truth["y"])
+
+    start_time = None
+    estimated_positions = [None] * len(gt_positions)
+    pos_est_covariances = [None] * len(gt_positions)
+    time_diffs = [int(1e15)] * len(gt_times_sec)
+
+    time_diff_us = lambda msg_time_ns, gt_time_sec: \
+        abs(msg_time_ns // 1000 - gt_time_sec * int(1e6))
+
+    # indices of flattened covariance matrix
+    VAR_X = 0
+    VAR_Y = 7
+    VAR_YAW = 35
+
+    # find estimated poses/covariances in odometry messages with timestamp
+    # closest to each given ground truth time
+    with Reader(fusion_bag) as reader:
+        for conn, timestamp, raw_data in reader.messages():
+            if start_time is None:
+                start_time = timestamp
+            if conn.topic == pos_estimate_topic:
+                for i, time_sec in enumerate(ground_truth_times_sec):
+                    diff = time_diff_us(timestamp - time_sec)
+                    if diff < time_diffs[i]:
+                        time_diffs[i] = diff
+                        msg = deserialize_cdr(raw_msg, "nav_msgs/msg/Odometry")
+                        pos = msg.pose.pose.position
+                        estimated_positions[i] = pos.x, pos.y
+                        cov = msg.pose.covariances
+                        pos_est_covariances[i] = cov[VAR_X], cov[VAR_Y], cov[VAR_YAW]
+
+    for est, real in zip(estimated_positions, gt_positions)
+        pos_errors.append(np.linalg.norm(np.array(est) - np.array(real))
+
+    # assume that the loop is closed at the last given ground truth position
+    # (the robot returned to the start position)
+    loop_closure_err = pos_errors[-1]
+    final_pose_variances = pos_est_covariances[-1] # 2D pose variances (x, y, yaw)
+
+    return loop_closure_err, sum(pos_errors), *pos_est_covariances
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -386,7 +449,7 @@ def main():
 
     evaluate_localization_configs(
         args.base_config, args.sensor_configs, args.sensor_data_bag,
-        ekf_config_dest, args.output_dir, first_last_pos_distance
+        ekf_config_dest, args.output_dir, ground_truth_error_with_estimated_covariances
     )
 
 
