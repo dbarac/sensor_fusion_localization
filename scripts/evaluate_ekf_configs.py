@@ -40,6 +40,7 @@ def run_fusion_localization_on_sensor_data(
 
     if launch_args is None:
         launch_args = []
+    launch_args += ["use_sim_time:=true", "rviz:=true"]
 
     launch_proc = subprocess.Popen(
         ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"] + launch_args,
@@ -300,7 +301,7 @@ def evaluate_localization_configs(
 
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
-                playback_bag_topics=sensor_config.get("sensor_data_bag_topics"),
+                playback_bag_topics=bag_info.get("topics"),
                 launch_args=sensor_config.get("localization_launch_args")
                 #,playback_duration_sec=30
             )

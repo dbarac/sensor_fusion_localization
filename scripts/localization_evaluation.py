@@ -105,7 +105,7 @@ def ground_truth_error_with_estimated_covariances(
     time_diff_ms = lambda msg_time_ns, gt_time_sec: \
         abs((msg_time_ns - first_bag_timestamp) // int(1e6) - gt_time_sec * 1000)
 
-    # indices of flattened covariance matrix
+    # indices of flattened covariance matrix (geometry_msgs/PoseWithCovariance.covariance)
     VAR_X = 0
     VAR_Y = 7
     VAR_YAW = 35
@@ -119,7 +119,6 @@ def ground_truth_error_with_estimated_covariances(
             if conn.topic == pos_estimate_topic:
                 for i, time_sec in enumerate(pose_ground_truth["times_sec"]):
                     diff = time_diff_ms(timestamp, time_sec)
-                    logging.info(f"diff {diff}")
                     if diff < time_diffs[i]:
                         time_diffs[i] = diff
                         msg = deserialize_cdr(raw_msg, "nav_msgs/msg/Odometry")

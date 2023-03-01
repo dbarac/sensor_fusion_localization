@@ -149,7 +149,7 @@ def generate_launch_description():
             arguments = ["0", "0", "0", "0", "0", "0", "map", "odom"],
             condition=UnlessCondition(LaunchConfiguration("rtabmap"))
         ),
-        # ** RViz - display wheel odometry, visual odometry, GPS odometry & EKF fused odometry **
+        # ** RViz - display RGB camera stream, wheel odometry, visual odometry, GPS odometry & EKF fused odometry **
         Node(
             package="rviz2",
             executable="rviz2",
