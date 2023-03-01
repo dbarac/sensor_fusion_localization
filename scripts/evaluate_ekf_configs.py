@@ -276,6 +276,9 @@ def evaluate_localization_configs(
             pose_ground_truth = bag_info["pose_ground_truth"]
 
     for name, sensor_config in possible_fusion_configs.items():
+        pose_estimate_topic = sensor_config.get(
+            "pose_estimate_topic", "/odometry/filtered"
+        )
         for i, rl_config in enumerate(generate_rl_configs(sensor_config["rl_config"])):
             config_name = f"{name}_{i}"
             logging.info(f"Evaluating localization config '{config_name}'...")
@@ -292,6 +295,9 @@ def evaluate_localization_configs(
             fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
 
             fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
+            if pose_estimate_topic not in fusion_odom_topics:
+                fusion_odom_topics.append(pose_estimate_topic)
+
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
                 playback_bag_topics=sensor_config.get("sensor_data_bag_topics"),
@@ -305,7 +311,6 @@ def evaluate_localization_configs(
             evaluation_function(
                 fusion_output_bag_path, pose_ground_truth, config_name, results_file=results_file
             )
-            #logging.info(f"{config_name} localization error: {error_score}\n\n")
 
 
 def main():

@@ -7,6 +7,7 @@ odom_gps:
     "/camera/imu", "/camera/aligned_depth_to_color/image_raw", "/camera/color/image_raw", "/camera/color/camera_info",
   ]
   localization_launch_args: ["rgbd_odom:=true", "rtabmap:=false", "rviz:=true", "realsense:=false", "use_sim_time:=true"]
+  pose_estimate_topic: "/rgbd_odom"
   rl_config:
     ekf_odom:
       ros__parameters:
