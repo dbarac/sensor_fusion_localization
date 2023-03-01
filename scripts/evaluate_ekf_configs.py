@@ -265,7 +265,7 @@ def evaluate_localization_configs(
 
     results_file = open(os.path.join(eval_output_dir, "evaluation_results.csv"), "w")
     results_file.write(
-        "ConfigName,FinalPositionError,PositionErrorSum" \
+        "ConfigName,FinalPositionError,PositionErrorSum,FinalYawError,YawErrorSum," \
         "FinalXEstimateVariance,FinalYEstimateVariance,FinalYawEstimateVariance\n"
     )
 
@@ -346,7 +346,6 @@ def main():
         args.base_config, args.sensor_configs, args.sensor_data_bag,
         ekf_config_dest, args.output_dir, ground_truth_error_with_estimated_covariances
     )
-
 
 if __name__ == "__main__":
     main()

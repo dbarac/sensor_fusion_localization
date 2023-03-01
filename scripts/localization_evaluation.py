@@ -147,7 +147,6 @@ def ground_truth_error_with_estimated_covariances(
         position_errors[-1], sum(position_errors), yaw_errors[-1], sum(yaw_errors),
         *pose_est_variances[-1]
     ]
-
     names = [
         "Final position error", "Position error sum", "Final yaw (abs) error", "Yaw error sum",
         "Final x estimate variance", "Final y estimate variance", "Final yaw estimate variance"
