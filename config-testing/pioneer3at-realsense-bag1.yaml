@@ -1,0 +1,13 @@
+path: "../bags/rosbag2_2023_02_08-17_22_28-fixed/"
+# select topics which should be played (optional argument - all topics played by default)
+topics: [
+  "/tf_static", "/clock", "/RosAria/pose", "/fix", "/cmd_vel",
+  "/camera/aligned_depth_to_color/image_raw", "/camera/color/image_raw",
+  "/camera/color/camera_info","/camera/imu",
+]
+# list of known positions at certain times in the bag (ground truth)
+pose_ground_truth:
+  times_sec: [1, 60, 90, 121, 149]
+  x: [0., 9.25, 9.25, 0., 0.]
+  y: [0., 0., -9.25, -9.25, 0.]
+  yaw: [0., -1.5707963267948966, -3.141592653589793, -4.71238898038469, 0.]
