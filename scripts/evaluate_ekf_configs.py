@@ -24,7 +24,7 @@ LOCALIZATION_PKG = "sensor_fusion_localization"
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
     topics_to_record: List[str], playback_duration_sec: Optional[int] = None,
-    launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None,
+    launch_wait_time: int = 10, log_dir: Optional[Union[Path, str]] = None,
     playback_bag_topics: Optional[List[str]] = None,
     launch_args: Optional[List[str]] = None
 ) -> None:
@@ -41,7 +41,7 @@ def run_fusion_localization_on_sensor_data(
 
     if launch_args is None:
         launch_args = []
-    launch_args += ["use_sim_time:=true", "rviz:=true"]
+    launch_args += ["use_sim_time:=true", "rviz:=false"]
 
     launch_proc = subprocess.Popen(
         ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"] + launch_args,
@@ -91,6 +91,7 @@ def odom_msg_get_pos(raw_msg: bytes) -> (float, float):
 def plot_robot_odometry(
     rosbag_path: Union[Path, str], odom_topics: List[str],
     results_dir: Union[Path, str], config_name: str,
+    pose_ground_truth: Optional[Dict]
 ) -> None:
     positions = {
         topic: [] for topic in odom_topics
@@ -99,6 +100,12 @@ def plot_robot_odometry(
         for connection, timestamp, raw_data in reader.messages():
             if connection.topic in odom_topics:
                 positions[connection.topic].append(odom_msg_get_pos(raw_data))
+
+    if pose_ground_truth is not None:
+        plt.plot(
+            pose_ground_truth["x"], pose_ground_truth["y"],
+            marker="p", linestyle="--", color="red", label="Pose ground truth"
+        )
 
     plt.axis('equal')
     for odom_topic in positions.keys():
@@ -174,19 +181,19 @@ def expand_covariance_matrix(cov: List) -> List:
         raise Exception("Dimension of cov is invalid")
 
 
-def generate_config_variants(experiment_config: Dict) -> Generator[Dict, None, None]:
+def generate_config_variants(experimental_config: Optional[Dict]) -> Generator[Dict, None, None]:
     """
     Generate one or more configurations for robot_localization.
 
     Expand covariance matrices if only diagonal elements are specified and
     generate all possible combinations of selected values of parameters
-    in experiment_config for which multiple values should be tested.
+    in experimental_config for which multiple values should be tested.
 
     A parameter with multiple values is marked by the value
     of the parameter being an element named 'try', which maps
     to a list of values which should be tested for this property,
 
-    For example, the following experiment_config would generate four
+    For example, the following experimental_config would generate four
     robot_localization configurations, each with a different combination
     of imu0_relative and imu0_queue_size:
     ```
@@ -200,47 +207,47 @@ def generate_config_variants(experiment_config: Dict) -> Generator[Dict, None, N
           try: [10, 20]
     ```
     """
-    assert len(experiment_config.keys()) == 1
-    rl_node_name = list(experiment_config.keys())[0]
-    node_config = experiment_config[rl_node_name]["ros__parameters"]
+    if experimental_config is None:
+        experimental_config = {} # only base config will be used
+
+    node_names = list(experimental_config.keys())
+    node_configs = {
+        name: experimental_config[name]["ros__parameters"] for name in node_names
+    }
 
     variable_config_params = {} # parameters with multiple possible values
-    for param, value in node_config.items():
-        not_yet_selected = \
-            lambda param_val : type(param_val) is dict and "try" in param_val
-        if not_yet_selected(value):
-            possible_values = value["try"]
-            assert type(possible_values) == list
-            variable_config_params[param] = possible_values
-        elif param in ("process_noise_covariance", "initial_estimate_covariance"):
-            node_config[param] = expand_covariance_matrix(value)
+    for node, config in node_configs.items():
+        for param, value in config.items():
+            not_yet_selected = \
+                lambda param_val : type(param_val) is dict and "try" in param_val
+            if not_yet_selected(value):
+                possible_values = value["try"]
+                assert type(possible_values) == list
+                variable_config_params[(node, param)] = possible_values
+            elif param in ("process_noise_covariance", "initial_estimate_covariance"):
+                config[param] = expand_covariance_matrix(value)
 
     if len(variable_config_params) > 0:
         # go through every combination in Cartesian product of possible parameter values
         for value_combination in itertools.product(*variable_config_params.values()):
-            param_names = variable_config_params.keys()
+            node_params = variable_config_params.keys()
             logging.info(
-                f"current param combination: {list(zip(param_names, value_combination))}"
+                f"current param combination: {list(zip(node_params, value_combination))}"
             )
-            for param, val in zip(param_names, value_combination):
+            for (node,param), val in zip(node_params, value_combination):
                 if param in ("process_noise_covariance", "initial_estimate_covariance"):
                     val = expand_covariance_matrix(val)
-                node_config[param] = val
-            yield {
-                rl_node_name : {
-                    "ros__parameters": node_config
-                }
-            }
+                node_configs[node][param] = val
+            yield experimental_config # yield current variant of the localization config
     else:
         # all parameter values are already determined
-        experiment_config[rl_node_name]["ros__paramters"] = node_config
-        yield experiment_config
+        yield experimental_config
 
 
 def evaluate_localization_configs(
     base_config_path: Union[Path, str], test_config_path: Union[Path, str],
     playback_bag_path: Union[Path, str], output_paths: Dict[str, Union[Path, str]],
-    evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[Path]], float]
+    evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[Path]], None]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
 
@@ -270,7 +277,7 @@ def evaluate_localization_configs(
         pose_estimate_topic = localization_config.get(
             "pose_estimate_topic", "/odometry/filtered"
         )
-        for i, config_variant in enumerate(generate_config_variants(localization_config["node_params"])):
+        for i, config_variant in enumerate(generate_config_variants(localization_config.get("node_params"))):
             config_name = f"{name}_{i}"
             logging.info(f"Evaluating localization config '{config_name}'...")
             current_config = merge_configuration(common_config.copy(), config_variant)
@@ -295,7 +302,8 @@ def evaluate_localization_configs(
                 playback_bag_topics=bag_info.get("topics"), launch_args=launch_args#, playback_duration_sec=30
             )
             plot_robot_odometry(
-                fusion_output_bag_path, fusion_odom_topics, output_paths["plot_dir"], config_name
+                fusion_output_bag_path, fusion_odom_topics, output_paths["plot_dir"],
+                config_name, bag_info["pose_ground_truth"]
             )
             # evaluate current localization config with provided function
             evaluation_function(
