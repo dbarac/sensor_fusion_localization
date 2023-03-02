@@ -10,7 +10,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_share = FindPackageShare(
         package="sensor_fusion_localization").find("sensor_fusion_localization")
-    robot_localization_config_file = os.path.join(pkg_share, "config/current_ekf_config.yaml")
+    default_localization_config_file = os.path.join(pkg_share, "config/localization_config.yaml")
     rviz_config_file = os.path.join(pkg_share, "config/robot-ekf-localization.rviz")
 
     rtabmap_parameters = {
@@ -55,6 +55,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "use_sim_time", default_value="false", choices=["true", "false"],
             description="Use simulation time or time from rosbag?"
+        ),
+        DeclareLaunchArgument(
+            "localization_config_file", default_value=default_localization_config_file,
+            description="Path to .yaml file with parameters for localization nodes"
         ),
         # nodes to launch
         Node(
@@ -119,7 +123,8 @@ def generate_launch_description():
             name="ekf_odom",
             output="screen",
             parameters=[
-                robot_localization_config_file, {"use_sim_time": LaunchConfiguration("use_sim_time")}
+                LaunchConfiguration("localization_config_file"),
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             condition=IfCondition(LaunchConfiguration("ekf"))
         ),
@@ -129,7 +134,8 @@ def generate_launch_description():
             name="navsat_transform",
             output="screen",
             parameters=[
-                robot_localization_config_file, {"use_sim_time": LaunchConfiguration("use_sim_time")}
+                LaunchConfiguration("localization_config_file"),
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
                 ("gps/fix", "/fix/checked"),
