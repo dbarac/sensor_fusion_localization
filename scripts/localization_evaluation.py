@@ -149,12 +149,13 @@ def ground_truth_error_with_estimated_covariances(
         "Final position error", "Position error sum", "Final yaw (abs) error", "Yaw error sum",
         "Final x estimate variance", "Final y estimate variance", "Final yaw estimate variance"
     ]
-    res_info = "\n" + "*" * 64 + "\n"
-    res_info += f"Evaluation results for config '{config_name}':\n"
+    res_info = "Evaluation completed.\n"
+    res_info += f"Results for config '{config_name}':\n"
     res_info += "\n".join(f"\t{name}: {value}" for name, value in zip(names, results))
     res_info += "\n" + "*" * 64
     logging.info(res_info)
 
     if results_file:
-        results_file.write(f"{config_name},")
-        results_file.write(",".join((str(r) for r in results)) + "\n")
+        with open(results_file, "a") as f:
+            f.write(f"{config_name},")
+            f.write(",".join((str(r) for r in results)) + "\n")

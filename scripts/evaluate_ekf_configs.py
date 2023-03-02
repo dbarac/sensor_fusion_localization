@@ -239,8 +239,8 @@ def generate_config_variants(experiment_config: Dict) -> Generator[Dict, None, N
 
 def evaluate_localization_configs(
     base_config_path: Union[Path, str], test_config_path: Union[Path, str],
-    playback_bag_path: Union[Path, str], eval_output_dir: Union[Path, str],
-    evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[TextIO]], float]
+    playback_bag_path: Union[Path, str], output_paths: Dict[str, Union[Path, str]],
+    evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[Path]], float]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
 
@@ -260,19 +260,6 @@ def evaluate_localization_configs(
     with open(test_config_path, "r") as f:
         test_configs = yaml.safe_load(f)
 
-    plot_dir = os.path.join(eval_output_dir, "plots")
-    os.mkdir(plot_dir)
-    bag_dir = os.path.join(eval_output_dir, "rosbags")
-    os.mkdir(bag_dir)
-    config_dir = os.path.join(eval_output_dir, "rl_configs")
-    os.mkdir(config_dir)
-
-    results_file = open(os.path.join(eval_output_dir, "evaluation_results.csv"), "w")
-    results_file.write(
-        "ConfigName,FinalPositionError,PositionErrorSum,FinalYawError,YawErrorSum," \
-        "FinalXEstimateVariance,FinalYEstimateVariance,FinalYawEstimateVariance\n"
-    )
-
     if playback_bag_path.endswith(".yaml"):
         with open(playback_bag_path, "r") as f:
             bag_info = yaml.safe_load(f)
@@ -288,16 +275,16 @@ def evaluate_localization_configs(
             logging.info(f"Evaluating localization config '{config_name}'...")
             current_config = merge_configuration(common_config.copy(), config_variant)
 
-            config_path = os.path.join(config_dir, f"{config_name}.yaml")
+            config_path = os.path.join(output_paths["config_dir"], f"{config_name}.yaml")
             with open(config_path, 'w') as f:
                 yaml.dump(current_config, f)
 
             launch_args = localization_config.get("localization_launch_args", [])
             launch_args.append(f"localization_config_file:={config_path}")
 
-            log_dir = os.path.join(eval_output_dir, "logs", config_name)
-            os.makedirs(log_dir)
-            fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
+            log_dir = os.path.join(output_paths["log_dir"], config_name)
+            os.mkdir(log_dir)
+            fusion_output_bag_path = os.path.join(output_paths["rosbag_dir"], f"{config_name}.bag")
 
             fusion_odom_topics = get_fusion_topics(current_config, types=["odom"])
             if pose_estimate_topic not in fusion_odom_topics:
@@ -308,12 +295,12 @@ def evaluate_localization_configs(
                 playback_bag_topics=bag_info.get("topics"), launch_args=launch_args#, playback_duration_sec=30
             )
             plot_robot_odometry(
-                fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
+                fusion_output_bag_path, fusion_odom_topics, output_paths["plot_dir"], config_name
             )
             # evaluate current localization config with provided function
             evaluation_function(
                 fusion_output_bag_path, pose_ground_truth, config_name,
-                pose_estimate_topic, results_file=results_file
+                pose_estimate_topic, results_file=output_paths["results_file"]
             )
 
 
@@ -342,18 +329,34 @@ def main():
 
     pkg_dir = FindPackageShare(package=LOCALIZATION_PKG).find(LOCALIZATION_PKG)
 
-    # path for saving the active robot_localization configuration
-    #ekf_config_dest = os.path.join(pkg_dir, "config/current_config.yaml")
-
     assert os.path.exists(args.base_config)
     assert os.path.exists(args.localization_configs)
     assert args.sensor_data_bag is not None
     assert os.path.exists(args.sensor_data_bag)
-    assert os.path.exists(args.output_dir)
+
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+    test_config_name = os.path.basename(args.localization_configs)
+    assert test_config_name.endswith(".yaml")
+    test_output_dir = os.path.join(args.output_dir, test_config_name[:-len(".yaml")])
+    os.mkdir(test_output_dir)
+
+    test_output_paths = {}
+    for d in ("config", "log", "plot", "rosbag"):
+        dir_path = os.path.join(test_output_dir, f"{d}s")
+        os.mkdir(dir_path)
+        test_output_paths[f"{d}_dir"] = dir_path
+    test_output_paths["results_file"] = os.path.join(test_output_dir, "evaluation_results.csv")
+    with open(test_output_paths["results_file"], "w") as f:
+        # add header to csv
+        f.write(
+            "ConfigName,FinalPositionError,PositionErrorSum,FinalYawError,YawErrorSum," \
+            "FinalXEstimateVariance,FinalYEstimateVariance,FinalYawEstimateVariance\n"
+        )
 
     evaluate_localization_configs(
         args.base_config, args.localization_configs, args.sensor_data_bag,
-        args.output_dir, ground_truth_error_with_estimated_covariances
+        test_output_paths, ground_truth_error_with_estimated_covariances
     )
 
 if __name__ == "__main__":
