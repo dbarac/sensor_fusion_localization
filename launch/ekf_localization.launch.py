@@ -36,20 +36,20 @@ def generate_launch_description():
     ]
     return LaunchDescription([
         # launch arguments
-        DeclareLaunchArgument("ekf", default_value="True", description="Run robot_localization ekf_node?"),
+        DeclareLaunchArgument("ekf", default_value="true", description="Run robot_localization ekf_node?"),
         DeclareLaunchArgument(
-            "navsat_transform", default_value="True", description="Run robot_localization navsat_transform_node?"
+            "navsat_transform", default_value="true", description="Run robot_localization navsat_transform_node?"
         ),
-        DeclareLaunchArgument("rtabmap", default_value="False", description="Run rtabmap?"),
-        DeclareLaunchArgument("rtabmapviz", default_value="False", description="Run rtabmapviz?"),
-        DeclareLaunchArgument("rgbd_odom", default_value="True", description="Run rtabmap rgbd_odometry?"),
-        DeclareLaunchArgument("rviz", default_value="False", description="Run rviz?"),
+        DeclareLaunchArgument("rtabmap", default_value="false", description="Run rtabmap?"),
+        DeclareLaunchArgument("rtabmapviz", default_value="false", description="Run rtabmapviz?"),
+        DeclareLaunchArgument("rgbd_odom", default_value="true", description="Run rtabmap rgbd_odometry?"),
+        DeclareLaunchArgument("rviz", default_value="false", description="Run rviz?"),
         DeclareLaunchArgument(
-            "gps_checker", default_value="True",
+            "gps_checker", default_value="true",
             description="Check /fix messages and publish on /fix/checked? (publish only if position changes)"
         ),
         DeclareLaunchArgument(
-            "realsense", default_value="False",
+            "realsense", default_value="false",
             description="Run realsense2_camera_node (D455 color, depth & IMU)?"
         ),
         DeclareLaunchArgument(
