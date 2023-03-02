@@ -235,8 +235,7 @@ def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
 
 def evaluate_localization_configs(
     base_rl_config: Union[Path, str], sensor_fusion_configs_yml: Union[Path, str],
-    playback_bag_path: Union[Path, str], rl_config_dest: Union[Path, str],
-    eval_output_dir: Union[Path, str],
+    playback_bag_path: Union[Path, str], eval_output_dir: Union[Path, str],
     evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[TextIO]], float]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
@@ -284,12 +283,13 @@ def evaluate_localization_configs(
             config_name = f"{name}_{i}"
             logging.info(f"Evaluating localization config '{config_name}'...")
             current_ekf_config = merge_configuration(common_config.copy(), rl_config)
-            # save config so it will be used when running the localization launch file
-            with open(rl_config_dest, 'w') as ekf_config_file:
-                yaml.dump(current_ekf_config, ekf_config_file)
 
-            with open(os.path.join(config_dir, f"{config_name}.yaml"), 'w') as f:
-                yaml.dump(current_ekf_config, f) # backup config for later use
+            config_path = os.path.join(config_dir, f"{config_name}.yaml")
+            with open(config_path, 'w') as f:
+                yaml.dump(current_ekf_config, f)
+
+            launch_args = sensor_config.get("localization_launch_args", [])
+            launch_args.append(f"localization_config_file:={config_path}")
 
             log_dir = os.path.join(eval_output_dir, "logs", config_name)
             os.makedirs(log_dir)
@@ -301,16 +301,16 @@ def evaluate_localization_configs(
 
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
-                playback_bag_topics=bag_info.get("topics"),
-                launch_args=sensor_config.get("localization_launch_args")
+                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args
                 #,playback_duration_sec=30
             )
             plot_robot_odometry(
                 fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
             )
-            # evaluate sensor fusion localization config with provided function
+            # evaluate current localization config with provided function
             evaluation_function(
-                fusion_output_bag_path, pose_ground_truth, config_name, results_file=results_file
+                fusion_output_bag_path, pose_ground_truth, config_name,
+                pose_estimate_topic, results_file=results_file
             )
 
 
@@ -350,7 +350,7 @@ def main():
 
     evaluate_localization_configs(
         args.base_config, args.sensor_configs, args.sensor_data_bag,
-        ekf_config_dest, args.output_dir, ground_truth_error_with_estimated_covariances
+        args.output_dir, ground_truth_error_with_estimated_covariances
     )
 
 if __name__ == "__main__":

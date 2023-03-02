@@ -81,8 +81,7 @@ def ground_truth_error_sum(
 
 def ground_truth_error_with_estimated_covariances(
         fusion_bag: Union[Path, str], pose_ground_truth: Dict[str, List],
-        config_name: str, pos_estimate_topic: str = "/odometry/filtered",
-        results_file: Optional[TextIO] = None
+        config_name: str, pose_estimate_topic: str, results_file: Optional[TextIO] = None
     ) -> None:
     """
     Localization evaluation function.
@@ -116,7 +115,7 @@ def ground_truth_error_with_estimated_covariances(
         for conn, timestamp, raw_msg in reader.messages():
             if first_bag_timestamp is None:
                 first_bag_timestamp = timestamp
-            if conn.topic == pos_estimate_topic:
+            if conn.topic == pose_estimate_topic:
                 for i, time_sec in enumerate(pose_ground_truth["times_sec"]):
                     diff = time_diff_ms(timestamp, time_sec)
                     if diff < time_diffs[i]:
@@ -136,7 +135,7 @@ def ground_truth_error_with_estimated_covariances(
         position_errors.append(np.linalg.norm(np.array(est) - np.array(real)))
 
     normalize_0_2pi = lambda theta: \
-        math.fmod(theta, 2*math.pi) + (2 * math.pi if theta < 0 else 0)
+        math.fmod(theta, 2 * math.pi) + (2 * math.pi if theta < 0 else 0)
     yaw_errors = []
     for est, real in zip(estimated_yaw, pose_ground_truth["yaw"]):
         err = abs(normalize_0_2pi(est) - normalize_0_2pi(real))
