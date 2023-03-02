@@ -7,6 +7,7 @@ import signal
 import time
 from pathlib import Path
 from typing import Callable, Dict, Generator, List, Union, Optional, TextIO
+
 import matplotlib.pyplot as plt
 import numpy as np
 import psutil
@@ -173,7 +174,7 @@ def expand_covariance_matrix(cov: List) -> List:
         raise Exception("Dimension of cov is invalid")
 
 
-def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
+def generate_config_variants(experiment_config: Dict) -> Generator[Dict, None, None]:
     """
     Generate one or more configurations for robot_localization.
 
@@ -218,6 +219,9 @@ def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
         # go through every combination in Cartesian product of possible parameter values
         for value_combination in itertools.product(*variable_config_params.values()):
             param_names = variable_config_params.keys()
+            logging.info(
+                f"current param combination: {list(zip(param_names, value_combination))}"
+            )
             for param, val in zip(param_names, value_combination):
                 if param in ("process_noise_covariance", "initial_estimate_covariance"):
                     val = expand_covariance_matrix(val)
@@ -234,14 +238,14 @@ def generate_rl_configs(experiment_config: Dict) -> Generator[Dict, None, None]:
 
 
 def evaluate_localization_configs(
-    base_rl_config: Union[Path, str], sensor_fusion_configs_yml: Union[Path, str],
+    base_config_path: Union[Path, str], test_config_path: Union[Path, str],
     playback_bag_path: Union[Path, str], eval_output_dir: Union[Path, str],
     evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[TextIO]], float]
 ) -> None:
     """Test and evaluate given robot_localization sensor configurations.
 
     For each combination/configuration of sensors, defined as a top-level
-    entry in the sensor_fusion_configs_yml yaml file:
+    entry in the test_config_path yaml file:
     * generate multiple robot_localization configs if multiple values should
       be tested for some parameters
     * combine the each generated sensor configuration with the base EKF
@@ -251,10 +255,10 @@ def evaluate_localization_configs(
     * plot sensor odometry & fused odometry
     * calculate localization error score with given evaluation function
     """
-    with open(base_rl_config, "r") as f:
+    with open(base_config_path, "r") as f:
         common_config = yaml.safe_load(f)
-    with open(sensor_fusion_configs_yml, "r") as f:
-        possible_fusion_configs = yaml.safe_load(f)
+    with open(test_config_path, "r") as f:
+        test_configs = yaml.safe_load(f)
 
     plot_dir = os.path.join(eval_output_dir, "plots")
     os.mkdir(plot_dir)
@@ -275,34 +279,33 @@ def evaluate_localization_configs(
             playback_bag_path = bag_info["path"]
             pose_ground_truth = bag_info["pose_ground_truth"]
 
-    for name, sensor_config in possible_fusion_configs.items():
-        pose_estimate_topic = sensor_config.get(
+    for name, localization_config in test_configs.items():
+        pose_estimate_topic = localization_config.get(
             "pose_estimate_topic", "/odometry/filtered"
         )
-        for i, rl_config in enumerate(generate_rl_configs(sensor_config["rl_config"])):
+        for i, config_variant in enumerate(generate_config_variants(localization_config["node_params"])):
             config_name = f"{name}_{i}"
             logging.info(f"Evaluating localization config '{config_name}'...")
-            current_ekf_config = merge_configuration(common_config.copy(), rl_config)
+            current_config = merge_configuration(common_config.copy(), config_variant)
 
             config_path = os.path.join(config_dir, f"{config_name}.yaml")
             with open(config_path, 'w') as f:
-                yaml.dump(current_ekf_config, f)
+                yaml.dump(current_config, f)
 
-            launch_args = sensor_config.get("localization_launch_args", [])
+            launch_args = localization_config.get("localization_launch_args", [])
             launch_args.append(f"localization_config_file:={config_path}")
 
             log_dir = os.path.join(eval_output_dir, "logs", config_name)
             os.makedirs(log_dir)
             fusion_output_bag_path = os.path.join(bag_dir, f"{config_name}.bag")
 
-            fusion_odom_topics = get_fusion_topics(sensor_config["rl_config"], types=["odom"])
+            fusion_odom_topics = get_fusion_topics(current_config, types=["odom"])
             if pose_estimate_topic not in fusion_odom_topics:
                 fusion_odom_topics.append(pose_estimate_topic)
 
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
-                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args
-                #,playback_duration_sec=30
+                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args#, playback_duration_sec=30
             )
             plot_robot_odometry(
                 fusion_output_bag_path, fusion_odom_topics, plot_dir, config_name
@@ -331,7 +334,7 @@ def main():
         help="path to output directory for storing rosbags, evaluation plots, etc."
     )
     ap.add_argument(
-        "-c", "--sensor_configs", type=str,
+        "-c", "--localization_configs", type=str,
         help="path to .yaml config file which defines all sensor fusion " \
              "configurations which should be evaluated"
     )
@@ -340,16 +343,16 @@ def main():
     pkg_dir = FindPackageShare(package=LOCALIZATION_PKG).find(LOCALIZATION_PKG)
 
     # path for saving the active robot_localization configuration
-    ekf_config_dest = os.path.join(pkg_dir, "config/current_ekf_config.yaml")
+    #ekf_config_dest = os.path.join(pkg_dir, "config/current_config.yaml")
 
     assert os.path.exists(args.base_config)
-    assert os.path.exists(args.sensor_configs)
+    assert os.path.exists(args.localization_configs)
     assert args.sensor_data_bag is not None
     assert os.path.exists(args.sensor_data_bag)
     assert os.path.exists(args.output_dir)
 
     evaluate_localization_configs(
-        args.base_config, args.sensor_configs, args.sensor_data_bag,
+        args.base_config, args.localization_configs, args.sensor_data_bag,
         args.output_dir, ground_truth_error_with_estimated_covariances
     )
 

@@ -4,7 +4,7 @@ rgbd_odom:
     "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/rgbd_odom"
-  rl_config:
+  node_params:
     ekf_odom:
       ros__parameters:
         odom0: /rgbd_odom
@@ -23,7 +23,7 @@ ekf_rgbd_odom:
     "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
-  rl_config:
+  node_params:
     ekf_odom:
       ros__parameters:
         odom0: /rgbd_odom
@@ -43,7 +43,7 @@ ekf_rgbd_odom_imu:
     "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
-  rl_config:
+  node_params:
     ekf_odom:
       ros__parameters:
         use_control: false
