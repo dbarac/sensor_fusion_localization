@@ -41,7 +41,7 @@ def run_fusion_localization_on_sensor_data(
 
     if launch_args is None:
         launch_args = []
-    launch_args += ["use_sim_time:=true", "rviz:=false"]
+    launch_args += ["use_sim_time:=true", "rviz:=true"]
 
     launch_proc = subprocess.Popen(
         ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"] + launch_args,
@@ -231,13 +231,14 @@ def generate_config_variants(experimental_config: Optional[Dict]) -> Generator[D
         # go through every combination in Cartesian product of possible parameter values
         for value_combination in itertools.product(*variable_config_params.values()):
             node_params = variable_config_params.keys()
-            logging.info(
-                f"current param combination: {list(zip(node_params, value_combination))}"
-            )
             for (node,param), val in zip(node_params, value_combination):
                 if param in ("process_noise_covariance", "initial_estimate_covariance"):
                     val = expand_covariance_matrix(val)
                 node_configs[node][param] = val
+
+            config_info = "\n".join(("\t" + str(p) for p in zip(node_params, value_combination)))
+            logging.info(f"Next param combination:\n{config_info}")
+
             yield experimental_config # yield current variant of the localization config
     else:
         # all parameter values are already determined
