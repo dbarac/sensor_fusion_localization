@@ -14,6 +14,7 @@ import numpy as np
 import psutil
 import yaml
 from launch_ros.substitutions import FindPackageShare
+import matplotlib.ticker as ticker
 from rosbags.rosbag2 import Reader
 from rosbags.serde import deserialize_cdr
 
@@ -21,6 +22,9 @@ from rosbags.serde import deserialize_cdr
 from localization_evaluation import *
 
 LOCALIZATION_PKG = "sensor_fusion_localization"
+
+mpl.style.use("bmh")
+plt.margins(0.12)
 
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
@@ -137,29 +141,27 @@ def get_estimated_trajectory(
 ##     plt.close()
 
 
-## def get_fusion_topics(
-##         rl_config: Dict, types: Optional[List[str]] = None,
-##         include_output_topic: bool = True
-## ) -> List[str]:
-##     """
-##     Return EKF fusion input and output topics defined in rl_config configuration.
-##     Example of fusion input definition: 'odom1: /odometry/gps'.
-##     """
-##     ekf_config = rl_config["ekf_odom"]["ros__parameters"]
-##     if types is None:
-##         types = ["odom", "imu", "twist", "pose"] # any type
-## 
-##     defines_fusion_input = lambda param, input_type : \
-##         param.startswith(input_type) and param[len(input_type):].isdecimal()
-##     fusion_topics = []
-##     for param, value in ekf_config.items():
-##         for input_type in types:
-##             if defines_fusion_input(param, input_type):
-##                 fusion_topics.append(value)
-##     if include_output_topic:
-##         fusion_topics.append("/odometry/filtered")
-## 
-##     return fusion_topics
+def get_fusion_topics(
+        rl_config: Dict, types: Optional[List[str]] = None,
+        include_output_topic: bool = True
+) -> List[str]:
+    """
+    Return EKF fusion input and output topics defined in rl_config configuration.
+    Example of fusion input definition: 'odom1: /odometry/gps'.
+    """
+    ekf_config = rl_config["ekf_odom"]["ros__parameters"]
+    if types is None:
+        types = ["odom", "imu", "twist", "pose"] # any type
+
+    defines_fusion_input = lambda param, input_type : \
+        param.startswith(input_type) and param[len(input_type):].isdecimal()
+    fusion_topics = []
+    for param, value in ekf_config.items():
+        for input_type in types:
+            if defines_fusion_input(param, input_type):
+                fusion_topics.append(value)
+
+    return fusion_topics
 
 
 def merge_configuration(current_config: Dict, new_config: Dict) -> Dict:
@@ -266,21 +268,24 @@ def save_trajectory_comparison_subplot_grid(
     N_COLS = min(2, len(trajectories))
     N_ROWS = math.ceil(len(trajectories) / N_COLS)
     fig, axs = plt.subplots(
-        ncols=N_COLS, nrows=N_ROWS, figsize=(4.6 * N_COLS, 4.6 * N_ROWS)
+        ncols=N_COLS, nrows=N_ROWS, figsize=(4.4 * N_COLS, 4.4 * N_ROWS)
     )
+    TICK_SPACING = 1
     for i, (config_name, topic, positions) in enumerate(trajectories):
         row, col = i // N_COLS, i % N_COLS
         x, y = zip(*positions) #[:-3]
         ax = axs[col] if N_ROWS == 1 else axs[row, col]
         ax.set_aspect('equal', adjustable='datalim')
-        ax.plot(x, y, label=topic)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(TICK_SPACING))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(TICK_SPACING))
         ax.plot(
             pose_ground_truth["x"], pose_ground_truth["y"],
-            marker="p", linestyle="--", color="red", label="Pose ground truth"
+            marker="p", linestyle="--", color="red", label="Pose ground truth" # #A60628
         )
+        ax.plot(x, y, label=topic, linewidth=1.5)
         ax.annotate(
-            "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -30),
-            arrowprops=dict(arrowstyle="simple", connectionstyle="arc3")
+            "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -35),
+            arrowprops=dict(arrowstyle="->", connectionstyle="arc3", color="black", linewidth=1.5)
         )
         ax.set_title(f"{config_name}")
         ax.set_xlabel("x[m]")
@@ -296,30 +301,33 @@ def save_trajectory_comparison_plot(
     plot_dir: Union[Path, str], config_name: str,
     trajectories: List[Tuple[str, List]], pose_ground_truth: Dict
 ) -> None:
-    # remove red (#d62728) from default colors to avoid confusing plots
-    # (ground truth trajectory will be red, so other ones shouldn't be)
-    mpl.rcParams["axes.prop_cycle"] = mpl.cycler(
-        "color",
-        ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b",
-         "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-    )
-
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.margins(0.09)
+    ax.margins(0.08)
     ax.set_xlabel("x[m]")
     ax.set_ylabel("y[m]")
+    TICK_SPACING = 1
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(TICK_SPACING))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(TICK_SPACING))
 
+    # remove red (#d62728) from default colors to avoid confusing plots
+    # (ground truth trajectory will be red, so other ones shouldn't be)
+    ax.set_prop_cycle(mpl.cycler("color",
+        ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b",
+         "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"])
+        #bmh["#348ABD", "#7A68A6", "#467821", "#D55E00","#CC79A7",
+        # "#56B4E9", "#009E73", "#F0E442", "#0072B2"])
+    )
     # plot ground truth positions
     ax.plot(
         pose_ground_truth["x"], pose_ground_truth["y"],
-        marker="p", linestyle="--", color="red", label="Pose ground truth"
+        marker="p", linestyle="--", color="red", label="Pose ground truth" #"#A60628"
     )
     ax.set_aspect('equal', adjustable='datalim')
 
     # plot estimate trajectories for all tested configurations
     for i, (config_name, topic, positions) in enumerate(trajectories):
         x, y = zip(*positions) #[:-3]
-        ax.plot(x, y, label=f"{config_name} ({topic})")
+        ax.plot(x, y, label=f"{config_name} ({topic})", linewidth=1.5)
 
     # annotate order of ground truth positions
     gt_positions = list(zip(pose_ground_truth["x"], pose_ground_truth["y"]))
@@ -329,6 +337,10 @@ def save_trajectory_comparison_plot(
     for i, (x, y) in enumerate(gt_positions):
         txt = f"gt(0), gt({len(gt_positions)})" if i == 0 and gt_loop_closed else f"gt({i})"
         ax.annotate(txt, (x, y), textcoords="offset points", xytext=(5, 8))
+    ax.annotate(
+            "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -35),
+            arrowprops=dict(arrowstyle="->", connectionstyle="arc3", color="black", linewidth=1.5)
+        )
     ax.legend(loc="center")
 
     #fig.tight_layout(pad=11)
@@ -389,7 +401,7 @@ def evaluate_localization_configs(
 
             run_fusion_localization_on_sensor_data(
                 playback_bag_path, fusion_output_bag_path, [pose_estimate_topic], log_dir=log_dir,
-                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args, playback_duration_sec=5
+                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args#, playback_duration_sec=5
             )
             # save trajectory for plotting
             trajectory = get_estimated_trajectory(fusion_output_bag_path, pose_estimate_topic)
@@ -415,20 +427,20 @@ def main():
 
     ap = argparse.ArgumentParser()
     ap.add_argument(
-        "-s", "--sensor_data_bag", type=str,
-        help="path to ros2 bag with recorded sensor data"
+        "-s", "--sensor_data_bag_info", type=str,
+        help="path to .yaml file with info about ros2 bag with recorded sensor data"
     )
     ap.add_argument(
         "-b", "--base_config", type=str,
-        help="path to base (common) robot_localization .yaml config file"
+        help="path to base (common) localization .yaml config file"
     )
     ap.add_argument(
         "-d", "--output_dir", type=str, default="/tmp/ekf_eval/",
         help="path to output directory for storing rosbags, evaluation plots, etc."
     )
     ap.add_argument(
-        "-c", "--localization_configs", type=str,
-        help="path to .yaml config file which defines all sensor fusion " \
+        "-t", "--test_config", type=str,
+        help="path to .yaml config file which defines all localization " \
              "configurations which should be evaluated"
     )
     args = ap.parse_args()
@@ -436,13 +448,13 @@ def main():
     pkg_dir = FindPackageShare(package=LOCALIZATION_PKG).find(LOCALIZATION_PKG)
 
     assert os.path.exists(args.base_config)
-    assert os.path.exists(args.localization_configs)
-    assert args.sensor_data_bag is not None
-    assert os.path.exists(args.sensor_data_bag)
+    assert os.path.exists(args.test_config)
+    assert args.sensor_data_bag_info is not None
+    assert os.path.exists(args.sensor_data_bag_info)
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
-    test_config_filename = os.path.basename(args.localization_configs)
+    test_config_filename = os.path.basename(args.test_config)
     assert test_config_filename.endswith(".yaml")
     test_config_name = test_config_filename[:-len(".yaml")]
 
@@ -466,7 +478,7 @@ def main():
         )
 
     evaluate_localization_configs(
-        args.base_config, args.localization_configs, args.sensor_data_bag,
+        args.base_config, args.test_config, args.sensor_data_bag_info,
         test_output_paths, ground_truth_error_with_estimated_covariances
     )
 
