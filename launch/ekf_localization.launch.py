@@ -11,7 +11,7 @@ def generate_launch_description():
     pkg_share = FindPackageShare(
         package="sensor_fusion_localization").find("sensor_fusion_localization")
     default_localization_config_file = os.path.join(pkg_share, "config/localization_config.yaml")
-    rviz_config_file = os.path.join(pkg_share, "config/robot-ekf-localization.rviz")
+    rviz_config_file = os.path.join(pkg_share, "rviz/robot-ekf-localization.rviz")
 
     rtabmap_remappings = [
         ("rgb/image", "/camera/color/image_raw"),

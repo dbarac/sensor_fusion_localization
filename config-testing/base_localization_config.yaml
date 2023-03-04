@@ -1,0 +1,60 @@
+ekf_odom:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    debug: false
+    debug_out_file: /tmp/rl_debug.txt
+  
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    publish_tf: false 
+    dynamic_process_noise_covariance: true
+    use_control: false
+
+navsat_transform:
+  ros__parameters:
+    frequency: 10.0
+    # If this is true, the altitude is set to 0 in the output odometry message. Defaults to false.
+    zero_altitude: true
+    broadcast_utm_transform: false
+    publish_filtered_gps: false
+
+    # If this is true, the node ignores the IMU data and gets its heading from the odometry source (typically the
+    # /odometry/filtered topic coming from one of robot_localization's state estimation nodes). BE CAREFUL when using this!
+    # The yaw value in your odometry source *must* be world-referenced, e.g., you cannot use your odometry source for yaw
+    # if your yaw data is based purely on integrated velocities. Defaults to false.
+    use_odometry_yaw: false
+    datum: [45.33790308, 14.424643, 3.0]
+
+    wait_for_datum: true
+
+rgbd_odometry:
+  ros__parameters:
+    frame_id: base_link
+    subscribe_depth: true
+    Odom/ResetCountdown: "1"
+    #"Vis/MinInliers":"40",
+    approx_sync: false
+    queue_size: 120
+    publish_tf: true
+    #"Reg/Force3DoF": True,
+    #"Optimizer/Slam2D": True,
+
+rtabmap:
+  ros__parameters:
+    frame_id: base_link
+    subscribe_depth: true
+    Odom/ResetCountdown: "1"
+    #"Vis/MinInliers":"40"
+    approx_sync: false
+    queue_size: 120
+    publish_tf: true
+    #"Reg/Force3DoF": True,
+    #"Optimizer/Slam2D": True,
