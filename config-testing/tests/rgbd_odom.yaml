@@ -1,0 +1,18 @@
+rgbd_odom:
+  description: "Localization with visual rgbd odometry - output of rgbd_odometry RTAB-Map node"
+  localization_launch_args: [
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/rgbd_odom"
+  node_params:
+    rgbd_odometry:
+      ros__parameters:
+        queue_size: 100
+        aprox_sync: true
+        #Reg/Force3DoF:
+        #  try: ["true", "false"]
+        Odom/Holonomic:
+          try: ["true", "false"]
+        Odom/Strategy:
+          try: ["0","1"]
+        #try: [true, false]
