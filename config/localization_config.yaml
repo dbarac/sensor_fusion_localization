@@ -1,0 +1,131 @@
+# For parameter descriptions, please refer to the template parameter files for each node.
+
+ekf_odom:
+  ros__parameters:
+    #use_sim_time: true
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    debug: false
+    debug_out_file: /tmp/rl_debug.txt
+  
+    map_frame: map
+    odom_frame: odom
+    #base_link_frame: base_link
+    base_link_frame: base_link
+    world_frame: map
+
+    # publish map->odom(->base_link) if world_frame is map?
+    publish_tf: false
+
+    dynamic_process_noise_covariance: true
+    use_control: false
+
+    odom0: /rgbd_odom
+    odom0_config: [false,  false,  false,
+                   false, false, false,
+                   true,  true,  true,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 20
+    odom0_nodelay: false
+    odom0_differential: false
+    odom0_relative: true
+
+    #imu0: /camera/imu
+    #imu0_config: [false, false, false,
+    #              false,  false, false,
+    #              false, false, false,
+    #              true, true,  true,
+    #              true,  true,  true]
+    ##imu0_nodelay: false
+    ##imu0_differential: false
+    ##imu0_relative: true
+    #imu0_queue_size: 60
+
+    #odom1: /odometry/gps
+    #odom1_config: [true,  true,  false,
+    #               false, false, false,
+    #               false, false, false,
+    #               false, false, false,
+    #               false, false, false]
+    #odom1_queue_size: 10
+    ##odom1_nodelay: true
+    #odom1_differential: false
+    #odom1_relative: true
+
+#    #process_noise_covariance: [0.05, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.05, 0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.06, 0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.03, 0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.03, 0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.06, 0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.025, 0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.025, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.04, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.01, 0.0,    0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.01, 0.0,    0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.02, 0.0,    0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.01, 0.0,    0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.01, 0.0,
+#    #                         0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.015]
+#
+#    #initial_estimate_covariance: [1e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    1e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    1e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    1e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    1e-9, 0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    1e-9, 0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1e-9, 0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1e-9, 0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1e-9, 0.0,     0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1e-9,  0.0,     0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     1e-9,  0.0,     0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     1e-9,  0.0,    0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     1e-9, 0.0,    0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    1e-9, 0.0,
+#    #                              0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,     0.0,    0.0,    1e-9]
+#    #use_control: true
+#    #stamped_control: false
+#    #control_timeout: 0.2
+#    #control_config: [true, false, false, false, false, true]
+#    #acceleration_limits: [1.3, 0.0, 0.0, 0.0, 0.0, 3.4]
+#    #deceleration_limits: [1.3, 0.0, 0.0, 0.0, 0.0, 4.5]
+#    #acceleration_gains: [0.8, 0.0, 0.0, 0.0, 0.0, 0.9]
+#    #deceleration_gains: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+#
+#
+navsat_transform:
+  ros__parameters:
+    #use_sim_time: true
+
+    frequency: 10.0
+    #delay: 3.0
+    #magnetic_declination_radians: 0.09983283 
+    magnetic_declination_radians: 0.0429351  # For lat/long 55.944831, -3.186998
+    #magnetic_declanation_radians: -0.09983283 # prvo mjerenje test1.bag2
+
+    #magnetic_declination_radians: 0.1340413 # taking from first GPS measure (Latitude:	33.0337693283° S Longitude:	60.8846327467° W ----->  7.68° W  ± 0.38°)
+    # Your IMU's yaw, once the magentic_declination_radians value is added to it, should report 0 when facing east. If it
+    # doesn't, enter the offset here. Defaults to 0.
+    #yaw_offset: -1.570796327  # IMU reads 0 facing magnetic north, not east # ESTO ES QUALQUIERA!!!!!!
+    yaw_offset: 0.0  # IMU reads 0 facing magnetic north, not east
+
+
+    # If this is true, the altitude is set to 0 in the output odometry message. Defaults to false.
+    zero_altitude: true
+    broadcast_utm_transform: false
+    publish_filtered_gps: true
+
+    # If this is true, the node ignores the IMU data and gets its heading from the odometry source (typically the
+    # /odometry/filtered topic coming from one of robot_localization's state estimation nodes). BE CAREFUL when using this!
+    # The yaw value in your odometry source *must* be world-referenced, e.g., you cannot use your odometry source for yaw
+    # if your yaw data is based purely on integrated velocities. Defaults to false.
+    use_odometry_yaw: false
+    datum: [45.33790308, 14.424643, 3.0]
+
+    wait_for_datum: true
+
