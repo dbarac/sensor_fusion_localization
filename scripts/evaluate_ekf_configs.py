@@ -6,8 +6,9 @@ import subprocess
 import signal
 import time
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Union, Optional, TextIO
+from typing import Callable, Dict, Generator, List, Union, Optional, TextIO, Tuple
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import psutil
@@ -24,7 +25,7 @@ LOCALIZATION_PKG = "sensor_fusion_localization"
 def run_fusion_localization_on_sensor_data(
     playback_bag_path: Union[Path, str], recording_bag_path: Union[Path, str],
     topics_to_record: List[str], playback_duration_sec: Optional[int] = None,
-    launch_wait_time: int = 10, log_dir: Optional[Union[Path, str]] = None,
+    launch_wait_time: int = 5, log_dir: Optional[Union[Path, str]] = None,
     playback_bag_topics: Optional[List[str]] = None,
     launch_args: Optional[List[str]] = None
 ) -> None:
@@ -88,65 +89,77 @@ def odom_msg_get_pos(raw_msg: bytes) -> (float, float):
     return pos.x, pos.y
 
 
-def plot_robot_odometry(
-    rosbag_path: Union[Path, str], odom_topics: List[str],
-    results_dir: Union[Path, str], config_name: str,
-    pose_ground_truth: Optional[Dict]
+def get_estimated_trajectory(
+    rosbag_path: Union[Path, str], pose_estimate_topic: List[str],
 ) -> None:
-    positions = {
-        topic: [] for topic in odom_topics
-    }
+    positions = []
     with Reader(rosbag_path) as reader:
         for connection, timestamp, raw_data in reader.messages():
-            if connection.topic in odom_topics:
-                positions[connection.topic].append(odom_msg_get_pos(raw_data))
-
-    if pose_ground_truth is not None:
-        plt.plot(
-            pose_ground_truth["x"], pose_ground_truth["y"],
-            marker="p", linestyle="--", color="red", label="Pose ground truth"
-        )
-
-    plt.axis('equal')
-    for odom_topic in positions.keys():
-        if len(positions[odom_topic]) > 0:
-            x, y = zip(*positions[odom_topic][:-3])
-            plt.plot(x, y, label=odom_topic)
-
-    plt.legend(loc="lower left")
-    plt.title(f"Robot odometry in /odom frame ({config_name})")
-    plt.savefig(
-        os.path.join(results_dir, f"{config_name}.png"), dpi=100, bbox_inches="tight"
-    )
-    plt.savefig(
-        os.path.join(results_dir, f"{config_name}.pdf"), dpi=100, bbox_inches="tight"
-    )
-    plt.close()
+            if connection.topic == pose_estimate_topic:
+                positions.append(odom_msg_get_pos(raw_data))
+    assert len(positions) > 0
+    return positions
 
 
-def get_fusion_topics(
-        rl_config: Dict, types: Optional[List[str]] = None,
-        include_output_topic: bool = True
-) -> List[str]:
-    """
-    Return EKF fusion input and output topics defined in rl_config configuration.
-    Example of fusion input definition: 'odom1: /odometry/gps'.
-    """
-    ekf_config = rl_config["ekf_odom"]["ros__parameters"]
-    if types is None:
-        types = ["odom", "imu", "twist", "pose"] # any type
+## def plot_robot_odometry(
+##     rosbag_path: Union[Path, str], odom_topics: List[str],
+##     results_dir: Union[Path, str], config_name: str,
+##     pose_ground_truth: Optional[Dict]
+## ) -> None:
+##     positions = {
+##         topic: [] for topic in odom_topics
+##     }
+##     with Reader(rosbag_path) as reader:
+##         for connection, timestamp, raw_data in reader.messages():
+##             if connection.topic in odom_topics:
+##                 positions[connection.topic].append(odom_msg_get_pos(raw_data))
+## 
+##     if pose_ground_truth is not None:
+##         plt.plot(
+##             pose_ground_truth["x"], pose_ground_truth["y"],
+##             marker="p", linestyle="--", color="red", label="Pose ground truth"
+##         )
+## 
+##     plt.axis('equal')
+##     for odom_topic in positions.keys():
+##         if len(positions[odom_topic]) > 0:
+##             x, y = zip(*positions[odom_topic][:-3])
+##             plt.plot(x, y, label=odom_topic)
+## 
+##     plt.legend(loc="lower left")
+##     plt.title(f"Robot odometry in /odom frame ({config_name})")
+##     plt.savefig(
+##         os.path.join(results_dir, f"{config_name}.png"), dpi=100, bbox_inches="tight"
+##     )
+##     plt.savefig(
+##         os.path.join(results_dir, f"{config_name}.pdf"), dpi=100, bbox_inches="tight"
+##     )
+##     plt.close()
 
-    defines_fusion_input = lambda param, input_type : \
-        param.startswith(input_type) and param[len(input_type):].isdecimal()
-    fusion_topics = []
-    for param, value in ekf_config.items():
-        for input_type in types:
-            if defines_fusion_input(param, input_type):
-                fusion_topics.append(value)
-    if include_output_topic:
-        fusion_topics.append("/odometry/filtered")
 
-    return fusion_topics
+## def get_fusion_topics(
+##         rl_config: Dict, types: Optional[List[str]] = None,
+##         include_output_topic: bool = True
+## ) -> List[str]:
+##     """
+##     Return EKF fusion input and output topics defined in rl_config configuration.
+##     Example of fusion input definition: 'odom1: /odometry/gps'.
+##     """
+##     ekf_config = rl_config["ekf_odom"]["ros__parameters"]
+##     if types is None:
+##         types = ["odom", "imu", "twist", "pose"] # any type
+## 
+##     defines_fusion_input = lambda param, input_type : \
+##         param.startswith(input_type) and param[len(input_type):].isdecimal()
+##     fusion_topics = []
+##     for param, value in ekf_config.items():
+##         for input_type in types:
+##             if defines_fusion_input(param, input_type):
+##                 fusion_topics.append(value)
+##     if include_output_topic:
+##         fusion_topics.append("/odometry/filtered")
+## 
+##     return fusion_topics
 
 
 def merge_configuration(current_config: Dict, new_config: Dict) -> Dict:
@@ -245,6 +258,81 @@ def generate_config_variants(experimental_config: Optional[Dict]) -> Generator[D
         yield experimental_config
 
 
+def save_trajectory_comparison_subplot_grid(
+    plot_dir: Union[Path, str], config_name: str,
+    trajectories: List[Tuple[str, List]], pose_ground_truth: Dict
+) -> None:
+    assert len(trajectories) > 1
+    N_COLS = min(2, len(trajectories))
+    N_ROWS = math.ceil(len(trajectories) / N_COLS)
+    fig, axs = plt.subplots(
+        ncols=N_COLS, nrows=N_ROWS, figsize=(4.6 * N_COLS, 4.6 * N_ROWS)
+    )
+    for i, (config_name, topic, positions) in enumerate(trajectories):
+        row, col = i // N_COLS, i % N_COLS
+        x, y = zip(*positions) #[:-3]
+        ax = axs[col] if N_ROWS == 1 else axs[row, col]
+        ax.set_aspect('equal', adjustable='datalim')
+        ax.plot(x, y, label=topic)
+        ax.plot(
+            pose_ground_truth["x"], pose_ground_truth["y"],
+            marker="p", linestyle="--", color="red", label="Pose ground truth"
+        )
+        ax.set_title(f"{config_name}")
+        ax.set_xlabel("x[m]")
+        ax.set_ylabel("y[m]")
+        ax.legend(loc="center")
+    fig.tight_layout()
+    fig.savefig(
+        os.path.join(plot_dir, "all-trajectories-grid.pdf"), dpi=150, bbox_inches="tight"
+    )
+
+
+def save_trajectory_comparison_plot(
+    plot_dir: Union[Path, str], config_name: str,
+    trajectories: List[Tuple[str, List]], pose_ground_truth: Dict
+) -> None:
+    # remove red (#d62728) from default colors to avoid confusing plots
+    # (ground truth trajectory will be red, so other ones shouldn't be)
+    mpl.rcParams["axes.prop_cycle"] = mpl.cycler(
+        "color",
+        ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b",
+         "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+    )
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.margins(0.09)
+    ax.set_xlabel("x[m]")
+    ax.set_ylabel("y[m]")
+
+    # plot ground truth positions
+    ax.plot(
+        pose_ground_truth["x"], pose_ground_truth["y"],
+        marker="p", linestyle="--", color="red", label="Pose ground truth"
+    )
+    ax.set_aspect('equal', adjustable='datalim')
+
+    # plot estimate trajectories for all tested configurations
+    for i, (config_name, topic, positions) in enumerate(trajectories):
+        x, y = zip(*positions) #[:-3]
+        ax.plot(x, y, label=f"{config_name} ({topic})")
+
+    # annotate order of ground truth positions
+    gt_positions = list(zip(pose_ground_truth["x"], pose_ground_truth["y"]))
+    gt_loop_closed = np.allclose(gt_positions[0], gt_positions[-1])
+    if gt_loop_closed:
+        gt_positions.pop()
+    for i, (x, y) in enumerate(gt_positions):
+        txt = f"gt(0), gt({len(gt_positions)})" if i == 0 and gt_loop_closed else f"gt({i})"
+        ax.annotate(txt, (x, y), textcoords="offset points", xytext=(5, 8))
+    ax.legend(loc="center")
+
+    #fig.tight_layout(pad=11)
+    fig.savefig(
+        os.path.join(plot_dir, "all-trajectories.pdf"), dpi=150, bbox_inches="tight"
+    )
+
+
 def evaluate_localization_configs(
     base_config_path: Union[Path, str], test_config_path: Union[Path, str],
     playback_bag_path: Union[Path, str], output_paths: Dict[str, Union[Path, str]],
@@ -274,6 +362,7 @@ def evaluate_localization_configs(
             playback_bag_path = bag_info["path"]
             pose_ground_truth = bag_info["pose_ground_truth"]
 
+    estimated_trajectories = []
     for name, localization_config in test_configs.items():
         pose_estimate_topic = localization_config.get(
             "pose_estimate_topic", "/odometry/filtered"
@@ -294,23 +383,27 @@ def evaluate_localization_configs(
             os.mkdir(log_dir)
             fusion_output_bag_path = os.path.join(output_paths["rosbag_dir"], f"{config_name}.bag")
 
-            fusion_odom_topics = get_fusion_topics(current_config, types=["odom"])
-            if pose_estimate_topic not in fusion_odom_topics:
-                fusion_odom_topics.append(pose_estimate_topic)
-
             run_fusion_localization_on_sensor_data(
-                playback_bag_path, fusion_output_bag_path, fusion_odom_topics, log_dir=log_dir,
-                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args#, playback_duration_sec=30
+                playback_bag_path, fusion_output_bag_path, [pose_estimate_topic], log_dir=log_dir,
+                playback_bag_topics=bag_info.get("topics"), launch_args=launch_args, playback_duration_sec=5
             )
-            plot_robot_odometry(
-                fusion_output_bag_path, fusion_odom_topics, output_paths["plot_dir"],
-                config_name, bag_info["pose_ground_truth"]
-            )
+            # save trajectory for plotting
+            trajectory = get_estimated_trajectory(fusion_output_bag_path, pose_estimate_topic)
+            estimated_trajectories.append((config_name, pose_estimate_topic, trajectory))
+
             # evaluate current localization config with provided function
             evaluation_function(
                 fusion_output_bag_path, pose_ground_truth, config_name,
                 pose_estimate_topic, results_file=output_paths["results_file"]
             )
+    # save plots
+    save_trajectory_comparison_plot(
+        output_paths["plot_dir"], config_name, estimated_trajectories, bag_info["pose_ground_truth"]
+    )
+    if len(estimated_trajectories) > 1:
+        save_trajectory_comparison_subplot_grid(
+            output_paths["plot_dir"], config_name, estimated_trajectories, bag_info["pose_ground_truth"]
+        )
 
 
 def main():
@@ -345,11 +438,16 @@ def main():
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
-    test_config_name = os.path.basename(args.localization_configs)
-    assert test_config_name.endswith(".yaml")
-    test_output_dir = os.path.join(args.output_dir, test_config_name[:-len(".yaml")])
+    test_config_filename = os.path.basename(args.localization_configs)
+    assert test_config_filename.endswith(".yaml")
+    test_config_name = test_config_filename[:-len(".yaml")]
+
+    test_output_dir = os.path.join(args.output_dir, test_config_name)
+    assert not os.path.exists(test_output_dir), \
+        f"Output directory for this test ({test_output_dir}) already exists, delete it to re-run the test."
     os.mkdir(test_output_dir)
 
+    # prepare output directories and evaluation result file
     test_output_paths = {}
     for d in ("config", "log", "plot", "rosbag"):
         dir_path = os.path.join(test_output_dir, f"{d}s")
@@ -367,6 +465,7 @@ def main():
         args.base_config, args.localization_configs, args.sensor_data_bag,
         test_output_paths, ground_truth_error_with_estimated_covariances
     )
+
 
 if __name__ == "__main__":
     main()
