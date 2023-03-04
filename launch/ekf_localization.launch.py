@@ -13,20 +13,6 @@ def generate_launch_description():
     default_localization_config_file = os.path.join(pkg_share, "config/localization_config.yaml")
     rviz_config_file = os.path.join(pkg_share, "config/robot-ekf-localization.rviz")
 
-    #rtabmap_parameters = {
-    #    "frame_id": "base_link",
-    #    "subscribe_depth": True,
-    #    #"publish_null_when_lost":False,
-    #    "Odom/ResetCountdown":"1",
-    #    #"Vis/MinInliers":"40",
-    #    "approx_sync": False,
-    #    #"use_sim_time": True,
-    #    "queue_size": 120,
-    #    "publish_tf": True, #rtabmap->map, rgbd_odometry->odom
-    #    #"wait_imu_to_init": True,
-    #    #"Reg/Force3DoF": True,
-    #    #"Optimizer/Slam2D": True,
-    #}
     rtabmap_remappings = [
         ("rgb/image", "/camera/color/image_raw"),
         ("rgb/camera_info", "/camera/color/camera_info"),
@@ -99,7 +85,7 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=rtabmap_remappings,
-            arguments=["--ros-args", "--log-level", "warn"], # a lot of output when set to "info" (default)
+            arguments=["--ros-args", "--log-level", "info"],
             condition=IfCondition(LaunchConfiguration("rgbd_odom"))
         ),
         Node(
