@@ -12,7 +12,7 @@ fi
 mkdir -p test-results # create dir if it doesn't exist already
 
 for TEST_FILE in tests/*; do
-    LOGFILE=".test-results/$(basename $TEST_FILE .yaml).log"
+    LOGFILE="./test-results/$(basename $TEST_FILE .yaml).log"
     python3 test_localization_configs.py \
         --base_config ./base_localization_config.yaml \
         --sensor_data_bag_info $BAG_INFO \
