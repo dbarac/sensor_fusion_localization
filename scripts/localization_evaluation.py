@@ -141,21 +141,23 @@ def ground_truth_error_with_estimated_covariances(
         err = abs(normalize_0_2pi(est) - normalize_0_2pi(real))
         yaw_errors.append(min(err, abs(err - 2 * math.pi)))
 
+    final_var_x, final_var_y, final_var_yaw = pose_est_variances[-1]
     results = [
-        position_errors[-1], sum(position_errors), yaw_errors[-1], sum(yaw_errors),
-        *pose_est_variances[-1]
+        position_errors[-1], sum(position_errors), final_var_x, final_var_y,
+        yaw_errors[-1], sum(yaw_errors), final_var_yaw
     ]
     names = [
-        "Final position error", "Position error sum", "Final yaw (abs) error", "Yaw error sum",
-        "Final x estimate variance", "Final y estimate variance", "Final yaw estimate variance"
+        "Final position error", "Position error sum", "Final x estimate variance", "Final y estimate variance",
+        "Final yaw (abs) error", "Yaw error sum", "Final yaw estimate variance"
     ]
+    print_float = lambda n: f"{n:.3f}" if (n > 1e-3 and n < 1e5) else f"{n:.3e}"
     res_info = "Evaluation completed.\n"
     res_info += f"Results for config '{config_name}':\n"
-    res_info += "\n".join(f"\t{name}: {value}" for name, value in zip(names, results))
+    res_info += "\n".join(f"\t{name}: {print_float(value)}" for name, value in zip(names, results))
     res_info += "\n" + "*" * 64
     logging.info(res_info)
 
     if results_file:
         with open(results_file, "a") as f:
             f.write(f"{config_name},")
-            f.write(",".join((str(r) for r in results)) + "\n")
+            f.write(",".join((print_float(val) for val in results)) + "\n")

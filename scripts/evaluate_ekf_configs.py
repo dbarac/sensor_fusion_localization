@@ -42,7 +42,7 @@ def run_fusion_localization_on_sensor_data(
 
     if launch_args is None:
         launch_args = []
-    launch_args += ["use_sim_time:=true", "rviz:=true"]
+    launch_args += ["use_sim_time:=true", "rviz:=false"]
 
     launch_proc = subprocess.Popen(
         ["ros2", "launch", LOCALIZATION_PKG, "ekf_localization.launch.py"] + launch_args,
@@ -278,6 +278,10 @@ def save_trajectory_comparison_subplot_grid(
             pose_ground_truth["x"], pose_ground_truth["y"],
             marker="p", linestyle="--", color="red", label="Pose ground truth"
         )
+        ax.annotate(
+            "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -30),
+            arrowprops=dict(arrowstyle="simple", connectionstyle="arc3")
+        )
         ax.set_title(f"{config_name}")
         ax.set_xlabel("x[m]")
         ax.set_ylabel("y[m]")
@@ -457,8 +461,8 @@ def main():
     with open(test_output_paths["results_file"], "w") as f:
         # add header to csv
         f.write(
-            "ConfigName,FinalPositionError,PositionErrorSum,FinalYawError,YawErrorSum," \
-            "FinalXEstimateVariance,FinalYEstimateVariance,FinalYawEstimateVariance\n"
+            "ConfigName,FinalPositionError,PositionErrorSum,FinalXEstimateVariance,FinalYEstimateVariance," \
+            "FinalYawError,YawErrorSum,FinalYawEstimateVariance\n"
         )
 
     evaluate_localization_configs(
