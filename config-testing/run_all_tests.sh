@@ -17,5 +17,5 @@ for TEST_FILE in tests/*; do
         --base_config ./base_localization_config.yaml \
         --sensor_data_bag_info $BAG_INFO \
         --output_dir ./test-results/ \
-        --test_config $TEST_FILE | tee $LOGFILE
+        --test_config $TEST_FILE 2>&1 | tee $LOGFILE
 done
