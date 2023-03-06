@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import logging
+import math
 import os
 import subprocess
 import signal
@@ -19,7 +20,7 @@ from rosbags.rosbag2 import Reader
 from rosbags.serde import deserialize_cdr
 
 # local
-from localization_evaluation import *
+from evaluation import ground_truth_error_with_estimated_covariances
 
 LOCALIZATION_PKG = "sensor_fusion_localization"
 
@@ -280,7 +281,7 @@ def save_trajectory_comparison_subplot_grid(
         ax.yaxis.set_major_locator(ticker.MultipleLocator(TICK_SPACING))
         ax.plot(
             pose_ground_truth["x"], pose_ground_truth["y"],
-            marker="p", linestyle="--", color="red", label="Pose ground truth" # #A60628
+            marker="p", linestyle="--", color="#d62728", label="Pose ground truth" # #A60628
         )
         ax.plot(x, y, label=topic, linewidth=1.5)
         ax.annotate(
@@ -320,7 +321,7 @@ def save_trajectory_comparison_plot(
     # plot ground truth positions
     ax.plot(
         pose_ground_truth["x"], pose_ground_truth["y"],
-        marker="p", linestyle="--", color="red", label="Pose ground truth" #"#A60628"
+        marker="p", linestyle="--", color="#d62728", label="Pose ground truth" #"#A60628"
     )
     ax.set_aspect('equal', adjustable='datalim')
 
