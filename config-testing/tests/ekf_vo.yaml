@@ -1,0 +1,61 @@
+rgbd_odom_3:
+  description: "Localization with visual rgbd odometry - output of rgbd_odometry RTAB-Map node"
+  localization_launch_args: [
+    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/rgbd_odom"
+  node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
+  
+ekf_rgbd:
+  description: "Localization with EKF filtered rgbd odometry"
+  localization_launch_args: [
+    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    ekf_node:
+      ros__parameters:
+        odom0: /rgbd_odom
+        odom0_config: 
+          try: [
+            # ekf_rgbd_0: use only velocities from sensor messages
+            [false,  false,  false,
+             false, false, false,
+             true,  true,  false,
+             false, false, true,
+             false, false, false],
+            # ekf_rgbd_1: use position+yaw & velocities 
+            [true,  true,  false,
+             false, false, true,
+             true,  true,  false,
+             false, false, true,
+             false, false, false],
+          ]
+        odom0_queue_size: 20
+        odom0_nodelay: false
+        odom0_differential: false
+        odom0_relative: false
+
+ekf_rgbd_2:
+  description: "Localization with EKF filtered rgbd odometry"
+  localization_launch_args: [
+    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    ekf_node:
+      ros__parameters:
+        odom0: /rgbd_odom
+        odom0_config: [true,  true,  false, # use position+yaw
+                       false, false, true,
+                       false, false,  false,
+                       false, false, false,
+                       false, false, false]
+        odom0_queue_size: 20
+        odom0_nodelay: false
+        odom0_differential: true # derive velocities from position/yaw information
+        odom0_relative: false

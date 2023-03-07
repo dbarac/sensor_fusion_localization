@@ -1,5 +1,5 @@
-rgbd_odom:
-  description: "Localization with visual rgbd odometry - output of rgbd_odometry RTAB-Map node"
+rgbdo_ba:
+  description: "Test F2M (Frame-to-Map) RGB-D odometry with and without local Bundle adjustment"
   localization_launch_args: [
     "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false", "gps_checker:=false"
   ]
@@ -7,7 +7,6 @@ rgbd_odom:
   node_params:
     rgbd_odometry:
       ros__parameters:
-        Odom/Holonomic:
-          try: ["true", "false"]
-        Odom/Strategy:
-          try: ["0","1"]
+        Odom/Strategy: "0" # F2M - same as default configuration
+        OdomF2M/BundleAdjustment:
+          try: ["0", "1"]
