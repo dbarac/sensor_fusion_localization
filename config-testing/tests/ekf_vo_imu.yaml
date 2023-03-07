@@ -1,0 +1,80 @@
+ekf_imu:
+  description: "Localization with EKF filtered IMU data"
+  localization_launch_args: [
+    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    ekf_node:
+      ros__parameters:
+        # use /cmd_vel velocity commands in prediction step
+        use_control: true
+        control_timeout: 0.3
+        control_config: [true, false, false, false, false, true] # use x and yaw velocities
+
+        imu0: /camera/imu
+        imu0_config: [false, false, false,
+                      false,  false, false,
+                      false, false, false,
+                      true, true,  true,
+                      true,  true,  true]
+        imu0_nodelay: false
+        imu0_differential: false
+        imu0_relative: false
+        imu0_queue_size: 60
+        imu0_remove_gravitational_acceleration: true
+
+ekf_vo_imu:
+  description: "Localization with EKF fusion with rgbd odometry + IMU"
+  localization_launch_args: [
+    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    ekf_node:
+      ros__parameters:
+        use_control: false
+
+        # use /cmd_vel velocity commands in prediction step
+        use_control: true
+        control_timeout: 0.3
+        control_config: [true, false, false, false, false, true] # use x and yaw velocities
+
+        odom0: /rgbd_odom
+        odom0_config: [true,  true,  false, # use position+yaw
+                       false, false, true,
+                       false, false,  false,
+                       false, false, false,
+                       false, false, false]
+        odom0_queue_size: 20
+        odom0_nodelay: false
+        odom0_differential: true # derive velocities from position/yaw information
+        odom0_relative: false
+
+        imu0: /camera/imu
+        imu0_config:
+          try: [
+            # ekf_vo_imu_0: use only acceleration 
+            [false, false, false,
+             false,  false, false,
+             false, false, false,
+             false, false, false,
+             true, true, true],
+            # ekf_vo_imu_1: use only angular velocities
+            [false, false, false,
+             false,  false, false,
+             false, false, false,
+             true, true, true,
+             false, false, false],
+            # ekf_vo_imu_2: use both
+            [false, false, false,
+             false,  false, false,
+             false, false, false,
+             true, true, true,
+             true, true, true],
+          ]
+        imu0_nodelay: false
+        imu0_differential: false
+        imu0_relative: false
+        imu0_queue_size: 60
+        imu0_remove_gravitational_acceleration: true
