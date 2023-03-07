@@ -150,7 +150,7 @@ def get_fusion_topics(
     Return EKF fusion input and output topics defined in rl_config configuration.
     Example of fusion input definition: 'odom1: /odometry/gps'.
     """
-    ekf_config = rl_config["ekf_odom"]["ros__parameters"]
+    ekf_config = rl_config["ekf_node"]["ros__parameters"]
     if types is None:
         types = ["odom", "imu", "twist", "pose"] # any type
 
@@ -213,7 +213,7 @@ def generate_config_variants(experimental_config: Optional[Dict]) -> Generator[D
     robot_localization configurations, each with a different combination
     of imu0_relative and imu0_queue_size:
     ```
-    ekf_odom:
+    ekf_node:
       ros__parameters:
         imu0: /imu
         odom0_nodelay: false
@@ -339,9 +339,9 @@ def save_trajectory_comparison_plot(
         txt = f"gt(0), gt({len(gt_positions)})" if i == 0 and gt_loop_closed else f"gt({i})"
         ax.annotate(txt, (x, y), textcoords="offset points", xytext=(5, 8))
     ax.annotate(
-            "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -35),
-            arrowprops=dict(arrowstyle="->", connectionstyle="arc3", color="black", linewidth=1.5)
-        )
+        "(start=finish)", (0, 0), textcoords="offset points", xytext=(25, -35),
+        arrowprops=dict(arrowstyle="->", connectionstyle="arc3", color="black", linewidth=1.5)
+    )
     ax.legend(loc="center")
 
     #fig.tight_layout(pad=11)
@@ -349,23 +349,33 @@ def save_trajectory_comparison_plot(
         os.path.join(plot_dir, "all-trajectories.pdf"), dpi=150, bbox_inches="tight"
     )
 
+def config_is_multivariant(localization_config: Dict) -> bool:
+    """
+    Check if configuration has parameters with multiple possible values
+    which should be tested.
+    """
+    for node, config in localization_config.items():
+        for param, val in config["ros__parameters"].items():
+            if type(val) is dict and "try" in val and type(val["try"]) is list:
+                return True
+    return False
+
 
 def evaluate_localization_configs(
     base_config_path: Union[Path, str], test_config_path: Union[Path, str],
     playback_bag_path: Union[Path, str], output_paths: Dict[str, Union[Path, str]],
     evaluation_function: Callable[[Union[Path, str], Dict, str, Optional[Path]], None]
 ) -> None:
-    """Test and evaluate given robot_localization sensor configurations.
+    """Test and evaluate given localization (robot_localization+rtabmap) configurations.
 
-    For each combination/configuration of sensors, defined as a top-level
-    entry in the test_config_path yaml file:
-    * generate multiple robot_localization configs if multiple values should
+    For each configuration, defined as a top-level entry in the test_config_path yaml file:
+    * generate multiple localization configs if multiple values should
       be tested for some parameters
-    * combine the each generated sensor configuration with the base EKF
+    * combine the each generated configuration with the base localization
       configuration and save it
-    * run sensor fusion localization launch file while playing sensor data
-      from given rosbag & and record fusion output
-    * plot sensor odometry & fused odometry
+    * run localization launch file while playing sensor data
+      from given rosbag & and record pose estimation output
+    * plot estimated robot trajectory and ground truth trajectory
     * calculate localization error score with given evaluation function
     """
     with open(base_config_path, "r") as f:
@@ -384,8 +394,10 @@ def evaluate_localization_configs(
         pose_estimate_topic = localization_config.get(
             "pose_estimate_topic", "/odometry/filtered"
         )
-        for i, config_variant in enumerate(generate_config_variants(localization_config.get("node_params"))):
-            config_name = f"{name}_{i}"
+        node_params = localization_config.get("node_params")
+        multivariant = config_is_multivariant(node_params)
+        for i, config_variant in enumerate(generate_config_variants(node_params)):
+            config_name = f"{name}_{i}" if multivariant else name
             logging.info(f"Evaluating localization config '{config_name}'...")
             current_config = merge_configuration(common_config.copy(), config_variant)
 
@@ -394,7 +406,7 @@ def evaluate_localization_configs(
                 yaml.dump(current_config, f)
 
             launch_args = localization_config.get("localization_launch_args", [])
-            launch_args.append(f"localization_config_file:={config_path}")
+            launch_args.append(f"config_file:={config_path}")
 
             log_dir = os.path.join(output_paths["log_dir"], config_name)
             os.mkdir(log_dir)

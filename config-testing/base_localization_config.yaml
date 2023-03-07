@@ -1,4 +1,4 @@
-ekf_odom:
+ekf_node:
   ros__parameters:
     frequency: 30.0
     sensor_timeout: 0.1
@@ -41,7 +41,7 @@ rgbd_odometry:
     subscribe_depth: true
     Odom/ResetCountdown: "1"
     #"Vis/MinInliers":"40",
-    approx_sync: false
+    approx_sync: true
     queue_size: 120
     publish_tf: true
     #"Reg/Force3DoF": True,
@@ -53,7 +53,7 @@ rtabmap:
     subscribe_depth: true
     Odom/ResetCountdown: "1"
     #"Vis/MinInliers":"40"
-    approx_sync: false
+    approx_sync: true
     queue_size: 120
     publish_tf: true
     #"Reg/Force3DoF": True,

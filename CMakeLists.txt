@@ -15,7 +15,7 @@ find_package(rclpy REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 install(
-  DIRECTORY config launch
+  DIRECTORY config launch rviz
   DESTINATION share/${PROJECT_NAME}
 )
 

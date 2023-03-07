@@ -43,7 +43,7 @@ def generate_launch_description():
             description="Use simulation time or time from rosbag?"
         ),
         DeclareLaunchArgument(
-            "localization_config_file", default_value=default_localization_config_file,
+            "config_file", default_value=default_localization_config_file,
             description="Path to .yaml file with parameters for localization nodes"
         ),
         # nodes to launch
@@ -81,7 +81,7 @@ def generate_launch_description():
         Node(
             package="rtabmap_ros", executable="rgbd_odometry", output="screen",
             parameters=[
-                LaunchConfiguration("localization_config_file"),
+                LaunchConfiguration("config_file"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=rtabmap_remappings,
@@ -91,7 +91,7 @@ def generate_launch_description():
         Node(
             package="rtabmap_ros", executable="rtabmap", output="screen",
             parameters=[
-                LaunchConfiguration("localization_config_file"),
+                LaunchConfiguration("config_file"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=rtabmap_remappings,
@@ -100,7 +100,7 @@ def generate_launch_description():
         ),
         Node(
             package="rtabmap_ros", executable="rtabmapviz", output="screen",
-            parameters=[LaunchConfiguration("localization_config_file")],
+            parameters=[LaunchConfiguration("config_file")],
             remappings=rtabmap_remappings,
             condition=IfCondition(LaunchConfiguration("rtabmapviz"))
         ),
@@ -108,10 +108,10 @@ def generate_launch_description():
         Node(
             package="robot_localization",
             executable="ekf_node",
-            name="ekf_odom",
+            name="ekf_node",
             output="screen",
             parameters=[
-                LaunchConfiguration("localization_config_file"),
+                LaunchConfiguration("config_file"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             condition=IfCondition(LaunchConfiguration("ekf"))
@@ -122,7 +122,7 @@ def generate_launch_description():
             name="navsat_transform",
             output="screen",
             parameters=[
-                LaunchConfiguration("localization_config_file"),
+                LaunchConfiguration("config_file"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
