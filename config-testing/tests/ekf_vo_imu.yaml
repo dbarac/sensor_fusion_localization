@@ -1,7 +1,7 @@
 ekf_imu:
   description: "Localization with EKF filtered IMU data"
   localization_launch_args: [
-    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
   node_params:
@@ -27,10 +27,14 @@ ekf_imu:
 ekf_vo_imu:
   description: "Localization with EKF fusion with rgbd odometry + IMU"
   localization_launch_args: [
-    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
   node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
     ekf_node:
       ros__parameters:
         use_control: false

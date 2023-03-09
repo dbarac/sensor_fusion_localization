@@ -1,7 +1,7 @@
 rgbd_odom_3:
   description: "Localization with visual rgbd odometry - output of rgbd_odometry RTAB-Map node"
   localization_launch_args: [
-    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false"
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=false", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/rgbd_odom"
   node_params:
@@ -13,10 +13,14 @@ rgbd_odom_3:
 ekf_rgbd:
   description: "Localization with EKF filtered rgbd odometry"
   localization_launch_args: [
-    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
   node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
     ekf_node:
       ros__parameters:
         odom0: /rgbd_odom
@@ -43,10 +47,14 @@ ekf_rgbd:
 ekf_rgbd_2:
   description: "Localization with EKF filtered rgbd odometry"
   localization_launch_args: [
-    "rgbd_odom:=false", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
   ]
   pose_estimate_topic: "/odometry/filtered"
   node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
     ekf_node:
       ros__parameters:
         odom0: /rgbd_odom

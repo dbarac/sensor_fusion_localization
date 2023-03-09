@@ -40,21 +40,15 @@ rgbd_odometry:
     frame_id: base_link
     subscribe_depth: true
     Odom/ResetCountdown: "1"
-    #"Vis/MinInliers":"40",
     approx_sync: true
     queue_size: 120
     publish_tf: true
-    #"Reg/Force3DoF": True,
-    #"Optimizer/Slam2D": True,
 
 rtabmap:
   ros__parameters:
     frame_id: base_link
     subscribe_depth: true
     Odom/ResetCountdown: "1"
-    #"Vis/MinInliers":"40"
     approx_sync: true
     queue_size: 120
     publish_tf: true
-    #"Reg/Force3DoF": True,
-    #"Optimizer/Slam2D": True,

@@ -1,0 +1,64 @@
+ekf_rgbd_2:
+  description: "Localization with EKF filtered rgbd odometry"
+  localization_launch_args: [
+    "rgbd_odom:=true", "rtabmap:=false", "realsense:=false", "ekf:=true", "navsat_transform:=false"
+  ]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
+    ekf_node:
+      ros__parameters:
+        odom0: /rgbd_odom
+        odom0_config: [true,  true,  false, # use position+yaw
+                       false, false, true,
+                       false, false,  false,
+                       false, false, false,
+                       false, false, false]
+        odom0_queue_size: 20
+        odom0_nodelay: false
+        odom0_differential: true # derive velocities from position/yaw information
+        odom0_relative: false
+
+ekf_rtabmap:
+  description: "Localization with EKF filtered rgbd odometry + pose messages from RTAB-MAP loop closure detection"
+  localization_launch_args: [
+    "rgbd_odom:=true", "rtabmap:=true", "realsense:=false", "ekf:=true", "navsat_transform:=false"]
+  pose_estimate_topic: "/odometry/filtered"
+  node_params:
+    rgbd_odometry:
+      ros__parameters:
+        Odom/Holonomic: "false"
+        Odom/Strategy: "1"
+
+    rtabmap:
+      ros__parameters:
+        Reg/Force3DoF: "true"
+        publish_tf: true
+    ekf_node:
+      ros__parameters:
+        world_frame: map
+        odom0: /rgbd_odom
+        odom0_config: [true,  true,  false, # use position+yaw
+                       false, false, true,
+                       false, false,  false,
+                       false, false, false,
+                       false, false, false]
+        odom0_queue_size: 20
+        odom0_nodelay: false
+        odom0_differential: true # derive velocities from position/yaw information
+        odom0_relative: false
+        publish_tf: false
+
+        pose0: /localization_pose # published by rtabmap when loop closure is detected
+        pose0_config: [true,  true,  false,
+                       false, false, true,
+                       false, false,  false,
+                       false, false, false,
+                       false, false, false]
+        pose0_queue_size: 20
+        pose0_nodelay: false
+        pose0_differential: false
+        pose0_relative: false
