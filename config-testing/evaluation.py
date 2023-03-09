@@ -14,27 +14,6 @@ from rosbags.rosbag2 import Reader
 from rosbags.serde import deserialize_cdr
 
 
-## def first_last_pos_distance(fusion_bag: Union[Path, str]) -> float:
-##     """
-##     Return distance between first and last
-##     /odometry/fused position in given rosbag.
-##
-##     Localization evaluation function for rosbags where
-##     the robots first and final position should be the same.
-##     """
-##     positions = []
-##     with Reader(fusion_bag) as reader:
-##         for connection, timestamp, raw_data in reader.messages():
-##             if connection.topic == "/odometry/filtered":
-##                 positions.append(odom_msg_get_pos(raw_data))
-##     first = np.array(positions[0])
-##     # ignore last few messages, there is a small delay between
-##     # the end of sensor data bag playback and the end of recording
-##     # the result playback
-##     last = np.array(positions[-5])
-##     return np.linalg.norm(first-last)
-
-
 def ground_truth_error_with_estimated_covariances(
         fusion_bag: Union[Path, str], pose_ground_truth: Dict[str, List],
         config_name: str, pose_estimate_topic: str, results_file: Optional[TextIO] = None

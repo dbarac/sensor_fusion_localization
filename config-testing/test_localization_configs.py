@@ -106,42 +106,6 @@ def get_estimated_trajectory(
     return positions
 
 
-## def plot_robot_odometry(
-##     rosbag_path: Union[Path, str], odom_topics: List[str],
-##     results_dir: Union[Path, str], config_name: str,
-##     pose_ground_truth: Optional[Dict]
-## ) -> None:
-##     positions = {
-##         topic: [] for topic in odom_topics
-##     }
-##     with Reader(rosbag_path) as reader:
-##         for connection, timestamp, raw_data in reader.messages():
-##             if connection.topic in odom_topics:
-##                 positions[connection.topic].append(odom_msg_get_pos(raw_data))
-## 
-##     if pose_ground_truth is not None:
-##         plt.plot(
-##             pose_ground_truth["x"], pose_ground_truth["y"],
-##             marker="p", linestyle="--", color="red", label="Pose ground truth"
-##         )
-## 
-##     plt.axis('equal')
-##     for odom_topic in positions.keys():
-##         if len(positions[odom_topic]) > 0:
-##             x, y = zip(*positions[odom_topic][:-3])
-##             plt.plot(x, y, label=odom_topic)
-## 
-##     plt.legend(loc="lower left")
-##     plt.title(f"Robot odometry in /odom frame ({config_name})")
-##     plt.savefig(
-##         os.path.join(results_dir, f"{config_name}.png"), dpi=100, bbox_inches="tight"
-##     )
-##     plt.savefig(
-##         os.path.join(results_dir, f"{config_name}.pdf"), dpi=100, bbox_inches="tight"
-##     )
-##     plt.close()
-
-
 def get_fusion_topics(
         rl_config: Dict, types: Optional[List[str]] = None,
         include_output_topic: bool = True
